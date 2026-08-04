@@ -1,0 +1,8 @@
+#form-status {
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+#form-status:empty {
+  display: none;
+}

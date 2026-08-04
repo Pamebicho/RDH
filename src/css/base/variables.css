@@ -1,0 +1,26 @@
+:root {
+  --krontec-blue: #23478f;
+  --krontec-blue-dark: #18366f;
+  --krontec-purple: #70549e;
+  --krontec-violet: #7d5fff;
+  --krontec-sky: #6ab6ef;
+  --krontec-gray: #d3d3d3;
+  --krontec-white: #ffffff;
+
+  --color-text: #111c35;
+  --color-text-muted: #667085;
+  --color-background: #f7f9fc;
+  --color-surface: #ffffff;
+  --color-border: #d8dee8;
+  --color-placeholder: #9aa6b8;
+  --color-danger: #c93434;
+  --color-danger-soft: #fff4f4;
+  --color-success: #198754;
+
+  --radius-control: 0.625rem;
+  --radius-card: 1.125rem;
+  --shadow-card: 0 1.25rem 3.75rem rgba(35, 71, 143, 0.12);
+  --shadow-focus: 0 0 0 0.25rem rgba(35, 71, 143, 0.1);
+
+  --transition-fast: 160ms ease;
+}

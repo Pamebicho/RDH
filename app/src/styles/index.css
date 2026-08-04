@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply h-full;
+  }
+
+  body {
+    @apply h-full bg-bg font-sans text-ink antialiased;
+  }
+
+  #root {
+    @apply h-full;
+  }
+}
+
+@layer components {
+  /* Botón primario de acción (Guardar, Aplicar selección, etc.) */
+  .btn-primary {
+    @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-control border
+      border-[#075bd4] bg-gradient-to-br from-[#0868ee] to-[#0753c0] px-4 font-semibold
+      text-white shadow-[0_0.65rem_1.25rem_rgba(7,84,192,0.16)] transition-all duration-fast
+      hover:-translate-y-px hover:shadow-[0_0.85rem_1.5rem_rgba(7,84,192,0.22)]
+      disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none;
+  }
+
+  /* Botón secundario/outline usado en la barra de acciones del período */
+  .btn-outline {
+    @apply inline-flex min-h-[46px] items-center justify-center gap-2 rounded-control border
+      border-[#cdd7e5] bg-white px-4 font-semibold text-[#0753c0] transition-all duration-fast
+      hover:-translate-y-px hover:border-[#86afe8] hover:bg-[#f5f9ff] hover:text-[#064aa9]
+      disabled:translate-y-0 disabled:opacity-60;
+  }
+
+  .form-input {
+    @apply w-full rounded-control border border-border bg-white px-3.5 py-2.5 text-sm text-ink
+      placeholder:text-[#9aa6b8] transition-all duration-fast
+      focus:border-krontec-blue focus:outline-none focus:ring-4 focus:ring-krontec-blue/10
+      disabled:cursor-not-allowed disabled:bg-[#f7f8fa] disabled:text-[#77859a];
+  }
+
+  .field-error {
+    @apply mt-1.5 min-h-[1.1rem] text-xs font-medium text-danger;
+  }
+}

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta
+    name="description"
+    content="Sistema de Registro de Horas de Krontec SpA."
+  >
+  <meta name="theme-color" content="#23478f">
+
+  <title>Iniciar sesión | Registro de Horas Krontec</title>
+
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+    integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+    crossorigin="anonymous"
+  >
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    rel="stylesheet"
+  >
+  <link rel="stylesheet" href="./src/css/main.css">
+</head>
+
+<body>
+  <main class="auth-layout">
+    <section class="auth-brand" aria-labelledby="system-title">
+      <div class="auth-brand__overlay" aria-hidden="true"></div>
+
+      <div class="auth-brand__inner">
+        <img
+          class="auth-brand__logo"
+          src="./assets/images/logo-krontec.png"
+          alt="Krontec"
+        >
+
+        <div class="auth-brand__content">
+          <p class="auth-brand__eyebrow">Sistema de</p>
+          <h1 id="system-title" class="auth-brand__title">
+            Registro de Horas
+          </h1>
+          <span class="auth-brand__line" aria-hidden="true"></span>
+          <p class="auth-brand__description">
+            Registra y gestiona tus horas trabajadas de forma simple,
+            rápida y segura.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="auth-form-panel" aria-labelledby="login-title">
+      <div class="mobile-brand">
+        <img
+          class="mobile-brand__logo"
+          src="./assets/images/logo-krontec.png"
+          alt="Krontec"
+        >
+      </div>
+
+      <article class="login-card">
+        <header class="login-card__header">
+          <div class="login-card__icon" aria-hidden="true">
+            <i class="bi bi-clock"></i>
+          </div>
+          <h2 id="login-title">Bienvenido</h2>
+          <p>Ingresa para acceder al sistema de registro de horas.</p>
+        </header>
+
+        <form id="login-form" novalidate>
+          <div class="form-field">
+            <label for="email" class="form-label">Correo corporativo</label>
+            <div class="input-group krontec-input">
+              <span class="input-group-text" aria-hidden="true">
+                <i class="bi bi-envelope"></i>
+              </span>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                class="form-control"
+                placeholder="usuario@krontec.cl"
+                autocomplete="username"
+                inputmode="email"
+                aria-describedby="email-error"
+                required
+              >
+            </div>
+            <div id="email-error" class="field-error" aria-live="polite"></div>
+          </div>
+
+          <div class="form-field">
+            <label for="password" class="form-label">Contraseña</label>
+            <div class="input-group krontec-input">
+              <span class="input-group-text" aria-hidden="true">
+                <i class="bi bi-lock"></i>
+              </span>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                class="form-control"
+                placeholder="Ingresa tu contraseña"
+                autocomplete="current-password"
+                aria-describedby="password-error"
+                required
+              >
+              <button
+                id="toggle-password"
+                class="btn password-toggle"
+                type="button"
+                aria-label="Mostrar contraseña"
+                aria-pressed="false"
+              >
+                <i id="password-icon" class="bi bi-eye" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div id="password-error" class="field-error" aria-live="polite"></div>
+          </div>
+
+          <div class="login-options">
+            <div class="form-check">
+              <input
+                id="remember"
+                name="remember"
+                class="form-check-input"
+                type="checkbox"
+              >
+              <label class="form-check-label" for="remember">Recordarme</label>
+            </div>
+
+            <a id="forgot-password" class="forgot-link" href="#">
+              ¿Olvidaste tu contraseña?
+            </a>
+          </div>
+
+          <button id="login-button" class="btn btn-krontec w-100" type="submit">
+            <i
+              id="login-icon"
+              class="bi bi-box-arrow-in-right"
+              aria-hidden="true"
+            ></i>
+            <span id="login-button-text">Iniciar sesión</span>
+            <span
+              id="login-spinner"
+              class="spinner-border spinner-border-sm d-none"
+              aria-hidden="true"
+            ></span>
+          </button>
+
+          <div class="login-separator" aria-hidden="true">
+            <span></span>
+            <small>o</small>
+            <span></span>
+          </div>
+
+          <button
+            id="microsoft-login"
+            class="btn btn-microsoft w-100"
+            type="button"
+          >
+            <i class="bi bi-microsoft" aria-hidden="true"></i>
+            <span>Iniciar sesión con Microsoft</span>
+          </button>
+
+          <div
+            id="form-status"
+            class="alert mt-4 mb-0 d-none"
+            role="alert"
+            aria-live="polite"
+          ></div>
+        </form>
+      </article>
+
+      <footer class="site-footer">
+        © <span id="current-year"></span> Krontec SpA. Todos los derechos reservados.
+      </footer>
+    </section>
+  </main>
+
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+    crossorigin="anonymous"
+  ></script>
+  <script type="module" src="./src/js/app.js"></script>
+</body>
+</html>

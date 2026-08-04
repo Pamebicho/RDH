@@ -1,0 +1,122 @@
+.form-field + .form-field {
+  margin-top: 0.5rem;
+}
+
+.form-label {
+  margin-bottom: 0.5rem;
+  color: var(--color-text);
+  font-size: 0.96rem;
+  font-weight: 700;
+}
+
+.krontec-input {
+  min-height: 3.55rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  overflow: hidden;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.krontec-input:focus-within {
+  border-color: var(--krontec-blue);
+  box-shadow: var(--shadow-focus);
+}
+
+.krontec-input.is-invalid {
+  border-color: var(--color-danger);
+  background: var(--color-danger-soft);
+  box-shadow: 0 0 0 0.25rem rgba(201, 52, 52, 0.08);
+}
+
+.krontec-input .input-group-text {
+  min-width: 3.25rem;
+  justify-content: center;
+  color: #758198;
+  border: 0;
+  background: transparent;
+  font-size: 1.2rem;
+}
+
+.krontec-input .form-control {
+  min-height: 3.45rem;
+  padding-inline: 0.25rem 0.875rem;
+  color: var(--color-text);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 1rem;
+}
+
+.krontec-input .form-control::placeholder {
+  color: var(--color-placeholder);
+}
+
+.password-toggle {
+  min-width: 3.25rem;
+  color: #758198;
+  border: 0;
+  background: transparent;
+  font-size: 1.2rem;
+}
+
+.password-toggle:hover,
+.password-toggle:focus {
+  color: var(--krontec-blue);
+  background: rgba(35, 71, 143, 0.07);
+}
+
+.field-error {
+  min-height: 1.25rem;
+  margin-top: 0.3rem;
+  color: var(--color-danger);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.login-options {
+  margin: 0.15rem 0 1.55rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.form-check-input {
+  border-color: #aeb7c5;
+}
+
+.form-check-input:checked {
+  border-color: var(--krontec-blue);
+  background-color: var(--krontec-blue);
+}
+
+.form-check-input:focus {
+  border-color: var(--krontec-blue);
+  box-shadow: 0 0 0 0.2rem rgba(35, 71, 143, 0.14);
+}
+
+.form-check-label {
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.forgot-link {
+  color: var(--krontec-blue);
+  font-size: 0.94rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.forgot-link:hover {
+  color: var(--krontec-purple);
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .login-options {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.7rem;
+  }
+}

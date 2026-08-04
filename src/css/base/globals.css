@@ -1,0 +1,19 @@
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-background);
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(35, 71, 143, 0.22);
+  outline-offset: 2px;
+}
+
+::selection {
+  color: var(--krontec-white);
+  background: var(--krontec-blue);
+}
