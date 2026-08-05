@@ -1,12 +1,16 @@
 import { NavLink } from "react-router-dom";
 import { toast } from "sonner";
 import { cn } from "@/utils/cn";
+import { useWorkforce } from "@/features/workforce/useWorkforce";
 import { NAV_ITEMS } from "./navItems";
 
 export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+  const { hasRole } = useWorkforce();
+  const visibleItems = NAV_ITEMS.filter((item) => !item.roles || item.roles.some((rol) => hasRole(rol)));
+
   return (
     <nav className="flex flex-col gap-1.5" aria-label="Módulos del sistema">
-      {NAV_ITEMS.map((item) => {
+      {visibleItems.map((item) => {
         const Icon = item.icon;
 
         if (!item.href) {

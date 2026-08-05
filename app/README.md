@@ -1,7 +1,9 @@
 # Registro de Horas Krontec — App (React + Supabase)
 
-Reconstrucción del prototipo estático (`../index.html`, `../pages/registro-horas.html`) como aplicación
-profesional: React + TypeScript + Tailwind CSS en el frontend, Supabase (Postgres + Auth) como backend.
+Sistema de registro de horas: React + TypeScript + Tailwind CSS en el frontend, Supabase (Postgres + Auth)
+como backend. Modelo de datos completo (22 tablas) con roles (Trabajador, Administrador, Lector, Super
+Admin), planillas semanales con flujo de aprobación, tipos de registro (ordinarias, extra, vacaciones,
+licencia, permiso, ausencia, capacitación) y jornadas configurables.
 
 ## Requisitos previos
 
@@ -18,13 +20,35 @@ Cierra y vuelve a abrir la terminal/VS Code después de instalar para que el `PA
 
 1. Crea una cuenta y un proyecto nuevo en [supabase.com](https://supabase.com).
 2. Ve a **SQL Editor** → pega el contenido completo de [`supabase/schema.sql`](./supabase/schema.sql) → **Run**.
-   Esto crea las tablas, las políticas de seguridad (RLS) y el catálogo inicial de centros de costo y períodos.
+   Esto crea las 22 tablas, las políticas de seguridad (RLS) por rol, las funciones helper, los triggers y
+   el catálogo inicial (roles, tipos de registro, jornada estándar, proyectos, un período de ejemplo).
+   **Advertencia:** si ya habías corrido una versión anterior del esquema, este script empieza borrando
+   esas tablas viejas (`profiles`, `cost_centers`, `periods`, etc.) — se pierden los datos de prueba
+   cargados con esa versión.
 3. Ve a **Authentication → Providers** y confirma que **Email** esté habilitado.
-4. (Opcional para probar) Ve a **Authentication → Users → Add user** y crea un usuario con correo
-   `@krontec.cl` para iniciar sesión.
+4. Ve a **Authentication → Users → Add user** y crea uno o más usuarios con correo `@krontec.cl`. Al
+   iniciar sesión por primera vez, un trigger les crea automáticamente su fila en `trabajadores` con el
+   rol **TRABAJADOR**. Para probar Administrador/Lector/Super Admin, asigna esos roles desde la pantalla
+   **Administración → Personas y roles** (necesitas que al menos un usuario tenga SUPER_ADMIN — asígnaselo
+   manualmente la primera vez desde el SQL Editor, ver sección siguiente).
 5. Ve a **Project Settings → API** y copia:
    - **Project URL** → `VITE_SUPABASE_URL`
    - **anon public key** → `VITE_SUPABASE_ANON_KEY`
+
+### Asignar el primer Super Admin
+
+La app no tiene forma de auto-asignarse SUPER_ADMIN (por diseño). Después de crear tu primer usuario e
+iniciar sesión una vez (para que el trigger le cree su `trabajador`), corre esto en el SQL Editor
+reemplazando el correo:
+
+```sql
+insert into public.trabajador_roles (trabajador_id, rol_id, activo)
+select t.id, r.id, true
+from public.trabajadores t, public.roles r
+where t.correo_corporativo = 'tu-correo@krontec.cl'
+  and r.codigo = 'SUPER_ADMIN'
+on conflict (trabajador_id, rol_id) do update set activo = true;
+```
 
 ## 2. Configurar variables de entorno
 
@@ -56,6 +80,19 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 | `npm run test:watch`| Corre los tests en modo watch               |
 | `npm run format`    | Formatea el código con Prettier             |
 
+## Roles y pantallas
+
+| Pantalla | Trabajador | Administrador | Lector | Super Admin |
+|---|---|---|---|---|
+| `/registro-horas` — cargar horas semanales | ✅ (propias) | ✅ (propias) | ❌ | ✅ |
+| `/aprobaciones` — aprobar/devolver planillas | ❌ | ✅ (solo sus proyectos) | ❌ | ✅ (todas) |
+| `/reportes` — reportes de solo lectura | ❌ | ❌ | ✅ (según su alcance) | ✅ |
+| `/administracion` — catálogos, personas y roles | ❌ | ❌ | ❌ | ✅ |
+
+Todo el filtrado está reforzado con Row Level Security en Supabase (no solo en la interfaz): un
+Administrador nunca recibe filas de proyectos que no administra, y un Lector nunca recibe datos fuera de
+lo que su fila en `lector_alcances` autoriza, aunque intente acceder directamente por URL o API.
+
 ## Estructura del proyecto
 
 ```
@@ -64,33 +101,38 @@ src/
   config/        Configuración de entorno (dominio corporativo)
   features/
     auth/        Login, validación (zod), contexto de sesión de Supabase
-    hours/       Registro de horas: lógica pura (domain.ts), estado (reducer.ts),
-                 datos (api.ts, hooks.ts) y componentes de la pantalla
+    workforce/   Perfil del trabajador actual y sus roles (WorkforceProvider/useWorkforce)
+    hours/       Registro de horas semanal: lógica pura (domain.ts), estado (reducer.ts),
+                 datos (api.ts, hooks.ts) y componentes (flujo Trabajador)
+    approvals/   Aprobación de planillas semanales (flujo Administrador)
+    reports/     Reportes agregados de solo lectura (flujo Lector)
+    admin/       Catálogos y gestión de personas/roles (flujo Super Admin)
   lib/           Cliente de Supabase y de React Query
-  pages/         Páginas de nivel de ruta (LoginPage, HoursRegisterPage)
-  routes/        Guards de rutas protegidas/públicas
-  types/         Tipos de la base de datos de Supabase
+  pages/         Páginas de nivel de ruta
+  routes/        Guards de rutas protegidas/públicas/por rol
+  types/         Tipos de la base de datos de Supabase (22 tablas)
 supabase/
-  schema.sql     Esquema completo: tablas, RLS, catálogo inicial
+  schema.sql     Esquema completo: 22 tablas, RLS por rol, funciones helper, triggers, catálogo inicial
 tests/
-  domain.test.ts         Tests de la lógica de cálculo de horas
+  domain.test.ts         Tests de la lógica de cálculo de horas semanales
   authValidation.test.ts Tests de validación del formulario de login
 ```
 
 ## Notas de diseño
 
-- El período por defecto al abrir "Registro de horas" es Julio 2026 (`2026-07`), igual que el prototipo
-  original. Puedes agregar más períodos insertando filas en `period_definitions` (tabla en Supabase).
-- Al crear el período de un usuario por primera vez, se preseleccionan **todos** los centros de costo
-  activos; el usuario los ajusta desde "Seleccionar centros". Esto reemplaza la selección fija que traía
-  el prototipo (los centros "por defecto" eran una simulación, no una regla de negocio real).
+- Los períodos siguen un ciclo de nómina (día 25 al día 24) y se dividen en semanas; cada semana es su
+  propia planilla (`planillas_semanales`) con su propio envío y aprobación — no se envía el período
+  completo de una vez.
+- Las horas esperadas por día salen de la jornada vigente del trabajador (`jornadas`/`jornada_dias`), no
+  de un valor fijo por período. Los feriados (`feriados`) descuentan horas esperadas ese día.
+- Al seleccionar proyectos para un período, cada uno se muestra como columna de horas ordinarias; los
+  tipos de registro sin proyecto (extraordinarias, vacaciones, licencia, permiso, ausencia, capacitación)
+  aparecen como columnas fijas adicionales.
 - El botón "Iniciar sesión con Microsoft" queda visible pero informativo: la integración real con Azure AD
   vía Supabase queda para una etapa futura.
-- El tope de 24 horas/día, copiar día/semana/mes anterior y la exportación a CSV funcionan igual que en el
-  prototipo original — la lógica se migró 1:1 a `src/features/hours/domain.ts` (con tests).
 
 ## Próximos pasos sugeridos
 
 - Conectar el botón de Microsoft a un proveedor Azure AD en Supabase Auth.
-- Panel de administración para gestionar `cost_centers` y `period_definitions` sin entrar al dashboard de Supabase.
+- Detalle de horas extra por proyecto (`detalle_horas_extra`) con su propio flujo de revisión.
 - Despliegue en Vercel o Netlify (build con `npm run build`, variables de entorno `VITE_*` en el panel del proveedor).

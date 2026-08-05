@@ -1,337 +1,233 @@
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useAuth } from "@/features/auth/useAuth";
-import type { CostCenter as ApiCostCenter, DailyNote, TimeEntry } from "@/types/database.types";
+import type { RegistroHoras, Semana } from "@/types/database.types";
 import {
-  ensurePeriod,
-  fetchCostCenters,
-  fetchDailyNotes,
-  fetchPeriod,
-  fetchPeriodDefinitions,
-  fetchSelectedCenterIds,
-  fetchTimeEntries,
-  submitPeriod,
-  updateSelectedCenterIds,
-  upsertDailyNotes,
-  upsertTimeEntries,
+  ensurePlanilla,
+  fetchFeriados,
+  fetchHorasEsperadasPorDia,
+  fetchPeriodos,
+  fetchProyectosActivos,
+  fetchRegistros,
+  fetchSemanas,
+  fetchTiposRegistroActivos,
+  submitPlanilla,
+  upsertRegistros,
+  type RegistroUpsert,
 } from "./api";
 import {
   buildCsvRows,
-  createMonthDays,
-  findPreviousEditableDate,
+  createWeekDays,
   formatHours,
   getColumnTotal,
   getDayTotal,
-  getPreviousPeriod,
-  getRegisteredHours,
+  getTotalesPorCategoria,
+  getWeekExpectedHours,
+  getWeekTotal,
   MAX_DAILY_HOURS,
-  roundHours,
   rowsToCsv,
-  type CostCenter,
-  type DayInfo,
-  type HoursByDateAndCenter,
-  type ObservationsByDate,
+  type ColumnaRegistro,
+  type HoursByDateAndColumn,
 } from "./domain";
-import { applySetHour, hoursDraftReducer, initialHoursDraft, type DaySnapshot } from "./reducer";
+import { applySetHour, initialWeekDraft, weekDraftReducer } from "./reducer";
 
-export function usePeriodDefinitions() {
-  return useQuery({ queryKey: ["period-definitions"], queryFn: fetchPeriodDefinitions });
+export function usePeriodos() {
+  return useQuery({ queryKey: ["periodos"], queryFn: fetchPeriodos });
 }
 
-export function useCostCenters() {
-  return useQuery({ queryKey: ["cost-centers"], queryFn: fetchCostCenters });
+export function useSemanas(periodoId: string | undefined) {
+  return useQuery({
+    queryKey: ["semanas", periodoId],
+    queryFn: () => fetchSemanas(periodoId as string),
+    enabled: Boolean(periodoId),
+  });
 }
 
-function toHoursMap(entries: TimeEntry[]): HoursByDateAndCenter {
-  const map: HoursByDateAndCenter = {};
-  for (const entry of entries) {
-    map[entry.entry_date] = { ...map[entry.entry_date], [entry.cost_center_id]: Number(entry.hours) };
-  }
-  return map;
+/**
+ * Columnas de la tabla semanal: los centros de costo son fijos para todos los trabajadores en
+ * todos los períodos (no hay selección por trabajador/período), más un tipo de registro sin
+ * proyecto por cada tipo que no lo requiera (extraordinarias, vacaciones, licencia, etc.).
+ */
+export function useColumnas() {
+  const proyectosQuery = useQuery({ queryKey: ["proyectos-activos"], queryFn: fetchProyectosActivos });
+  const tiposQuery = useQuery({ queryKey: ["tipos-registro-activos"], queryFn: fetchTiposRegistroActivos });
+
+  const columnas = useMemo<ColumnaRegistro[]>(() => {
+    const tipoOrd = tiposQuery.data?.find((tipo) => tipo.codigo === "ORD");
+
+    const columnasProyecto: ColumnaRegistro[] = tipoOrd
+      ? (proyectosQuery.data ?? []).map((proyecto) => ({
+          id: proyecto.id,
+          tipoRegistroId: tipoOrd.id,
+          proyectoId: proyecto.id,
+          codigo: proyecto.codigo,
+          etiqueta: proyecto.nombre,
+          categoria: tipoOrd.categoria,
+          esHoraExtra: tipoOrd.es_hora_extra,
+        }))
+      : [];
+
+    const columnasSinProyecto: ColumnaRegistro[] = (tiposQuery.data ?? [])
+      .filter((tipo) => !tipo.requiere_proyecto)
+      .map((tipo) => ({
+        id: tipo.codigo,
+        tipoRegistroId: tipo.id,
+        proyectoId: null,
+        codigo: tipo.codigo,
+        etiqueta: tipo.nombre,
+        categoria: tipo.categoria,
+        esHoraExtra: tipo.es_hora_extra,
+      }));
+
+    return [...columnasProyecto, ...columnasSinProyecto];
+  }, [proyectosQuery.data, tiposQuery.data]);
+
+  return {
+    columnas,
+    isLoading: proyectosQuery.isLoading || tiposQuery.isLoading,
+  };
 }
 
-function toObservationsMap(notes: DailyNote[]): ObservationsByDate {
-  return Object.fromEntries(notes.map((note) => [note.entry_date, note.observation]));
-}
-
-export function useHoursRegister(period: string) {
-  const { session } = useAuth();
-  const userId = session?.user.id;
-  const queryClient = useQueryClient();
-
-  const periodQuery = useQuery({
-    queryKey: ["period", userId, period],
-    queryFn: () => ensurePeriod(userId as string, period),
-    enabled: Boolean(userId),
-  });
-
-  const periodId = periodQuery.data?.id;
-
-  const definitionsQuery = usePeriodDefinitions();
-  const allCentersQuery = useCostCenters();
-
-  const selectedIdsQuery = useQuery({
-    queryKey: ["period-cost-centers", periodId],
-    queryFn: () => fetchSelectedCenterIds(periodId as string),
-    enabled: Boolean(periodId),
-  });
-
-  const entriesQuery = useQuery({
-    queryKey: ["time-entries", periodId],
-    queryFn: () => fetchTimeEntries(periodId as string),
-    enabled: Boolean(periodId),
-  });
-
-  const notesQuery = useQuery({
-    queryKey: ["daily-notes", periodId],
-    queryFn: () => fetchDailyNotes(periodId as string),
-    enabled: Boolean(periodId),
-  });
-
-  const [draft, dispatch] = useReducer(hoursDraftReducer, initialHoursDraft);
-  const loadedForPeriodId = useRef<string | null>(null);
-
-  const isReady =
-    Boolean(periodId) &&
-    entriesQuery.isSuccess &&
-    notesQuery.isSuccess &&
-    selectedIdsQuery.isSuccess;
-
-  useEffect(() => {
-    if (!isReady || !periodId || loadedForPeriodId.current === periodId) {
-      return;
-    }
-
-    loadedForPeriodId.current = periodId;
-    dispatch({
-      type: "loaded",
-      hours: toHoursMap(entriesQuery.data ?? []),
-      observations: toObservationsMap(notesQuery.data ?? []),
-      selectedCenterIds: selectedIdsQuery.data ?? [],
-    });
-  }, [isReady, periodId, entriesQuery.data, notesQuery.data, selectedIdsQuery.data]);
-
-  useEffect(() => {
-    loadedForPeriodId.current = null;
-    dispatch({ type: "reset" });
-  }, [period]);
-
-  useEffect(() => {
-    if (!draft.dirty) return;
-
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [draft.dirty]);
-
-  const days: DayInfo[] = useMemo(() => createMonthDays(period), [period]);
-
-  const allCenters: ApiCostCenter[] = useMemo(() => allCentersQuery.data ?? [], [allCentersQuery.data]);
-  const selectedCenters: CostCenter[] = useMemo(
-    () => allCenters.filter((center) => draft.selectedCenterIds.includes(center.id)),
-    [allCenters, draft.selectedCenterIds],
+function mapRegistrosToHours(registros: RegistroHoras[], columns: ColumnaRegistro[]): HoursByDateAndColumn {
+  const columnaPorProyecto = new Map(
+    columns.filter((columna) => columna.proyectoId).map((columna) => [columna.proyectoId as string, columna.id]),
+  );
+  const columnaPorTipoRegistro = new Map(
+    columns.filter((columna) => !columna.proyectoId).map((columna) => [columna.tipoRegistroId, columna.id]),
   );
 
-  const periodDefinition = definitionsQuery.data?.find((definition) => definition.period === period);
-  const expectedHours = periodDefinition?.expected_hours ?? 0;
-  const registeredHours = getRegisteredHours(days, draft.hours, selectedCenters);
-  const remainingHours = Math.max(0, roundHours(expectedHours - registeredHours));
-  const progress =
-    expectedHours > 0 ? Math.min(100, roundHours((registeredHours / expectedHours) * 100)) : 0;
+  const hours: HoursByDateAndColumn = {};
 
-  const status = periodQuery.data?.status ?? "editing";
-  const isSubmitted = status === "submitted";
+  for (const registro of registros) {
+    const columnId = registro.proyecto_id
+      ? columnaPorProyecto.get(registro.proyecto_id)
+      : columnaPorTipoRegistro.get(registro.tipo_registro_id);
+
+    if (!columnId) continue;
+
+    hours[registro.fecha] = { ...hours[registro.fecha], [columnId]: Number(registro.horas) };
+  }
+
+  return hours;
+}
+
+/** Estado y acciones de la tabla de UNA semana (planilla semanal) para el trabajador actual. */
+export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana, columns: ColumnaRegistro[]) {
+  const queryClient = useQueryClient();
+  const days = useMemo(() => createWeekDays(semana.fecha_inicio, semana.fecha_fin), [semana.fecha_inicio, semana.fecha_fin]);
+
+  const planillaQuery = useQuery({
+    queryKey: ["planilla", trabajadorId, semana.id],
+    queryFn: () => ensurePlanilla(trabajadorId as string, semana.id, semana.periodo_id),
+    enabled: Boolean(trabajadorId),
+  });
+
+  const planillaId = planillaQuery.data?.id;
+  const isSubmitted = (planillaQuery.data?.estado ?? "BORRADOR") !== "BORRADOR" && (planillaQuery.data?.estado ?? "BORRADOR") !== "DEVUELTA";
+
+  const registrosQuery = useQuery({
+    queryKey: ["registros", planillaId],
+    queryFn: () => fetchRegistros(planillaId as string),
+    enabled: Boolean(planillaId),
+  });
+
+  const horasEsperadasQuery = useQuery({
+    queryKey: ["horas-esperadas", trabajadorId, semana.fecha_inicio],
+    queryFn: () => fetchHorasEsperadasPorDia(trabajadorId as string, semana.fecha_inicio),
+    enabled: Boolean(trabajadorId),
+  });
+
+  const feriadosQuery = useQuery({
+    queryKey: ["feriados", semana.fecha_inicio, semana.fecha_fin],
+    queryFn: () => fetchFeriados(semana.fecha_inicio, semana.fecha_fin),
+  });
+
+  const [draft, dispatch] = useReducer(weekDraftReducer, initialWeekDraft);
+  const loadedForPlanillaId = useRef<string | null>(null);
+
+  const isReady = Boolean(planillaId) && registrosQuery.isSuccess;
+
+  useEffect(() => {
+    if (!isReady || !planillaId || loadedForPlanillaId.current === planillaId) return;
+
+    loadedForPlanillaId.current = planillaId;
+    dispatch({ type: "loaded", hours: mapRegistrosToHours(registrosQuery.data ?? [], columns) });
+    // Las columnas pueden cambiar cuando el trabajador ajusta sus proyectos seleccionados;
+    // no queremos recargar el borrador cada vez que eso pase, solo al cambiar de planilla.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReady, planillaId, registrosQuery.data]);
+
+  const columnIds = useMemo(() => columns.map((columna) => columna.id), [columns]);
+
+  const expectedHours = getWeekExpectedHours(days, horasEsperadasQuery.data ?? {}, feriadosQuery.data ?? new Set());
+  const registeredHours = getWeekTotal(days, draft.hours, columns);
+  const totales = getTotalesPorCategoria(draft.hours, columns);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!periodId) return;
+      if (!planillaId || !trabajadorId) return;
 
-      const timeEntryRows = days.flatMap((day) =>
-        selectedCenters.map((center) => ({
-          period_id: periodId,
-          entry_date: day.date,
-          cost_center_id: center.id,
-          hours: Number(draft.hours[day.date]?.[center.id] || 0),
+      const rows: RegistroUpsert[] = days.flatMap((day) =>
+        columns.map((columna) => ({
+          planilla_semanal_id: planillaId,
+          trabajador_id: trabajadorId,
+          fecha: day.date,
+          proyecto_id: columna.proyectoId,
+          tipo_registro_id: columna.tipoRegistroId,
+          horas: Number(draft.hours[day.date]?.[columna.id] || 0),
         })),
       );
 
-      const noteRows = days
-        .filter((day) => (draft.observations[day.date] ?? "").length > 0)
-        .map((day) => ({
-          period_id: periodId,
-          entry_date: day.date,
-          observation: draft.observations[day.date] ?? "",
-        }));
-
-      await upsertTimeEntries(timeEntryRows);
-      await upsertDailyNotes(noteRows);
+      await upsertRegistros(rows);
     },
     onSuccess: () => {
       dispatch({ type: "saved" });
-      toast.success("El registro quedó guardado en la base de datos.");
-      void queryClient.invalidateQueries({ queryKey: ["time-entries", periodId] });
-      void queryClient.invalidateQueries({ queryKey: ["daily-notes", periodId] });
+      toast.success(`Semana ${semana.numero_semana}: cambios guardados.`);
+      void queryClient.invalidateQueries({ queryKey: ["registros", planillaId] });
     },
     onError: () => {
-      toast.error("No fue posible guardar los cambios. Inténtalo nuevamente.");
-    },
-  });
-
-  const applyCentersMutation = useMutation({
-    mutationFn: async (centerIds: string[]) => {
-      if (!periodId) return;
-      await updateSelectedCenterIds(periodId, centerIds);
-      return centerIds;
-    },
-    onSuccess: (centerIds) => {
-      if (!centerIds) return;
-      dispatch({ type: "apply-centers", centerIds });
-      toast.success("La tabla fue actualizada con los centros seleccionados.");
-    },
-    onError: () => {
-      toast.error("No fue posible actualizar los centros de costo.");
+      toast.error("No fue posible guardar los cambios de esta semana.");
     },
   });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!periodId) return;
+      if (!planillaId) return;
       await saveMutation.mutateAsync();
-      await submitPeriod(periodId);
+      await submitPlanilla(planillaId, totales);
     },
     onSuccess: () => {
-      toast.success("El período fue enviado para aprobación y quedó bloqueado.");
-      void queryClient.invalidateQueries({ queryKey: ["period", userId, period] });
+      toast.success(`Semana ${semana.numero_semana} enviada para aprobación.`);
+      void queryClient.invalidateQueries({ queryKey: ["planilla", trabajadorId, semana.id] });
     },
     onError: () => {
-      toast.error("No fue posible enviar el período para aprobación.");
+      toast.error("No fue posible enviar la semana para aprobación.");
     },
   });
 
-  function setHour(date: string, centerId: string, rawValue: number) {
+  function setHour(date: string, columnId: string, rawValue: number) {
     if (isSubmitted) return;
 
-    const { clamped } = applySetHour(draft, date, centerId, rawValue);
+    const { clamped } = applySetHour(draft, date, columnId, columnIds, rawValue);
     if (clamped) {
       toast.warning(`El total diario no puede superar ${formatHours(MAX_DAILY_HOURS)} horas.`);
     }
 
-    dispatch({ type: "set-hour", date, centerId, value: rawValue });
-  }
-
-  function setObservation(date: string, value: string) {
-    if (isSubmitted) return;
-    dispatch({ type: "set-observation", date, value });
+    dispatch({ type: "set-hour", date, columnId, columnIds, value: rawValue });
   }
 
   function setActiveDate(date: string | null) {
     dispatch({ type: "set-active-date", date });
   }
 
-  function copyPreviousDay() {
-    if (!draft.activeDate) {
-      toast.warning("Selecciona primero un día de la tabla.");
-      return;
-    }
-
-    const previousDate = findPreviousEditableDate(days, draft.activeDate);
-    if (!previousDate) {
-      toast.warning("No existe un día anterior disponible para copiar.");
-      return;
-    }
-
-    const snapshot: DaySnapshot = {
-      date: draft.activeDate,
-      hours: draft.hours[previousDate] ?? {},
-      observation: draft.observations[previousDate] ?? "",
-    };
-
-    dispatch({ type: "merge-days", days: [snapshot] });
-    toast.success("Se copiaron las horas del día hábil anterior.");
-  }
-
-  function copyPreviousWeek() {
-    if (!draft.activeDate) {
-      toast.warning("Selecciona un día de la semana que deseas completar.");
-      return;
-    }
-
-    const activeIndex = days.findIndex((day) => day.date === draft.activeDate);
-    const snapshots: DaySnapshot[] = [];
-
-    for (let offset = 0; offset < 7; offset += 1) {
-      const target = days[activeIndex + offset];
-      const source = days[activeIndex + offset - 7];
-
-      if (target && source && !target.weekend) {
-        snapshots.push({
-          date: target.date,
-          hours: draft.hours[source.date] ?? {},
-          observation: draft.observations[source.date] ?? "",
-        });
-      }
-    }
-
-    if (!snapshots.length) {
-      toast.warning("No hay una semana anterior disponible dentro de este período.");
-      return;
-    }
-
-    dispatch({ type: "merge-days", days: snapshots });
-    toast.success(`Se copiaron ${snapshots.length} días desde la semana anterior.`);
-  }
-
-  async function copyPreviousMonth() {
-    if (!userId) return;
-
-    const previousPeriod = getPreviousPeriod(period);
-    const previousPeriodRow = await fetchPeriod(userId, previousPeriod);
-
-    if (!previousPeriodRow) {
-      toast.warning("No existe un registro guardado del mes anterior para copiar.");
-      return;
-    }
-
-    const [previousEntries, previousNotes] = await Promise.all([
-      fetchTimeEntries(previousPeriodRow.id),
-      fetchDailyNotes(previousPeriodRow.id),
-    ]);
-
-    const previousHours = toHoursMap(previousEntries);
-    const previousObservations = toObservationsMap(previousNotes);
-    const previousDays = createMonthDays(previousPeriod);
-
-    const snapshots: DaySnapshot[] = days
-      .map((day, index) => ({ day, previousDay: previousDays[index] }))
-      .filter(({ day, previousDay }) => !day.weekend && previousDay)
-      .map(({ day, previousDay }) => ({
-        date: day.date,
-        hours: previousHours[previousDay.date] ?? {},
-        observation: previousObservations[previousDay.date] ?? "",
-      }));
-
-    if (!snapshots.length) {
-      toast.warning("El mes anterior no tiene días hábiles equivalentes para copiar.");
-      return;
-    }
-
-    dispatch({ type: "merge-days", days: snapshots });
-    toast.success("Se copiaron los datos disponibles del mes anterior.");
-  }
-
   function exportCsv() {
-    const rows = buildCsvRows(days, selectedCenters, draft.hours, draft.observations);
+    const rows = buildCsvRows(days, columns, draft.hours);
     const csv = rowsToCsv(rows);
     const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `registro-horas-${period}.csv`;
+    link.download = `registro-horas-semana-${semana.numero_semana}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -340,32 +236,21 @@ export function useHoursRegister(period: string) {
   }
 
   return {
-    isLoading: periodQuery.isLoading || allCentersQuery.isLoading || definitionsQuery.isLoading,
+    isLoading: planillaQuery.isLoading || registrosQuery.isLoading || horasEsperadasQuery.isLoading,
     days,
-    allCenters,
-    selectedCenters,
-    selectedCenterIds: draft.selectedCenterIds,
+    estado: planillaQuery.data?.estado ?? "BORRADOR",
+    isSubmitted,
     hours: draft.hours,
-    observations: draft.observations,
     activeDate: draft.activeDate,
     dirty: draft.dirty,
-    status,
-    isSubmitted,
-    periodDefinition,
     expectedHours,
     registeredHours,
-    remainingHours,
-    progress,
-    getDayTotal: (date: string) => getDayTotal(draft.hours, selectedCenters, date),
-    getColumnTotal: (centerId: string) => getColumnTotal(draft.hours, centerId),
+    remainingHours: Math.max(0, expectedHours - registeredHours),
+    totales,
+    getDayTotal: (date: string) => getDayTotal(draft.hours, columns, date),
+    getColumnTotal: (columnId: string) => getColumnTotal(draft.hours, columnId),
     setHour,
-    setObservation,
     setActiveDate,
-    applyCenters: (centerIds: string[]) => applyCentersMutation.mutate(centerIds),
-    isApplyingCenters: applyCentersMutation.isPending,
-    copyPreviousDay,
-    copyPreviousWeek,
-    copyPreviousMonth,
     save: () => saveMutation.mutate(),
     isSaving: saveMutation.isPending,
     submit: () => submitMutation.mutate(),

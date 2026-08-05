@@ -1,5 +1,4 @@
-// Lógica pura del registro de horas: sin acceso a red ni al DOM, 100% testeable.
-// Traducción directa de la lógica validada en src/js/modules/registro-horas.js del prototipo.
+// Lógica pura del registro de horas semanal: sin acceso a red ni al DOM, 100% testeable.
 
 export const MAX_DAILY_HOURS = 24;
 
@@ -11,15 +10,37 @@ export interface DayInfo {
   weekend: boolean;
 }
 
-export interface CostCenter {
+/** Una columna de la tabla semanal: un proyecto (horas ordinarias) o un tipo de registro sin proyecto. */
+export interface ColumnaRegistro {
   id: string;
-  name: string;
+  tipoRegistroId: string;
+  proyectoId: string | null;
+  codigo: string;
+  etiqueta: string;
+  categoria: string;
+  esHoraExtra: boolean;
 }
 
-/** horas[fecha][centroId] = horas cargadas ese día en ese centro */
-export type HoursByDateAndCenter = Record<string, Record<string, number>>;
-/** observaciones[fecha] = texto de observación de ese día */
-export type ObservationsByDate = Record<string, string>;
+/** horas[fecha][columna.id] = horas cargadas ese día en esa columna */
+export type HoursByDateAndColumn = Record<string, Record<string, number>>;
+
+/** horasEsperadasPorDia[1..7] = horas esperadas ese día de la semana (1 = lunes ... 7 = domingo) */
+export type HorasEsperadasPorDia = Record<number, number>;
+
+function parseIsoDate(iso: string): Date {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatIsoDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** Convierte el día JS (0=domingo..6=sábado) a ISO (1=lunes..7=domingo). */
+function diaSemanaIso(date: Date): number {
+  const jsWeekday = date.getDay();
+  return jsWeekday === 0 ? 7 : jsWeekday;
+}
 
 export function roundHours(value: number): number {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
@@ -39,107 +60,122 @@ export function formatPercent(value: number): string {
   })}%`;
 }
 
-export function createMonthDays(period: string): DayInfo[] {
-  const [year, month] = period.split("-").map(Number);
-  const lastDay = new Date(year, month, 0).getDate();
+/** Genera los días (inclusive) entre fechaInicio y fechaFin de una semana. */
+export function createWeekDays(fechaInicio: string, fechaFin: string): DayInfo[] {
+  const start = parseIsoDate(fechaInicio);
+  const end = parseIsoDate(fechaFin);
+  const days: DayInfo[] = [];
 
-  return Array.from({ length: lastDay }, (_, index) => {
-    const day = index + 1;
-    const date = new Date(year, month - 1, day);
-    const weekday = date.getDay();
-
-    return {
-      date: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
-      label: `${String(day).padStart(2, "0")} ${WEEKDAYS[weekday]}`,
+  for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+    const weekday = cursor.getDay();
+    days.push({
+      date: formatIsoDate(cursor),
+      label: `${String(cursor.getDate()).padStart(2, "0")} ${WEEKDAYS[weekday]}`,
       weekend: weekday === 0 || weekday === 6,
-    };
-  });
+    });
+  }
+
+  return days;
 }
 
-export function getDayTotal(
-  hours: HoursByDateAndCenter,
-  centers: CostCenter[],
+export function getExpectedHoursForDay(
+  horasEsperadasPorDia: HorasEsperadasPorDia,
   date: string,
+  feriados: ReadonlySet<string>,
 ): number {
-  const dayHours = hours[date] ?? {};
-  return roundHours(centers.reduce((total, center) => total + Number(dayHours[center.id] || 0), 0));
+  if (feriados.has(date)) return 0;
+  return horasEsperadasPorDia[diaSemanaIso(parseIsoDate(date))] ?? 0;
 }
 
-export function getColumnTotal(hours: HoursByDateAndCenter, centerId: string): number {
+export function getWeekExpectedHours(
+  days: DayInfo[],
+  horasEsperadasPorDia: HorasEsperadasPorDia,
+  feriados: ReadonlySet<string>,
+): number {
   return roundHours(
-    Object.values(hours).reduce((total, dayHours) => total + Number(dayHours[centerId] || 0), 0),
+    days.reduce((total, day) => total + getExpectedHoursForDay(horasEsperadasPorDia, day.date, feriados), 0),
   );
 }
 
-export function getRegisteredHours(
-  days: DayInfo[],
-  hours: HoursByDateAndCenter,
-  centers: CostCenter[],
-): number {
-  return roundHours(days.reduce((total, day) => total + getDayTotal(hours, centers, day.date), 0));
+export function getDayTotal(hours: HoursByDateAndColumn, columns: ColumnaRegistro[], date: string): number {
+  const dayHours = hours[date] ?? {};
+  return roundHours(columns.reduce((total, col) => total + Number(dayHours[col.id] || 0), 0));
 }
 
-/**
- * Calcula el máximo permitido para un input de horas sin exceder el tope diario,
- * dado lo ya cargado en los otros centros seleccionados ese mismo día.
- */
+export function getColumnTotal(hours: HoursByDateAndColumn, columnId: string): number {
+  return roundHours(
+    Object.values(hours).reduce((total, dayHours) => total + Number(dayHours[columnId] || 0), 0),
+  );
+}
+
+export function getWeekTotal(days: DayInfo[], hours: HoursByDateAndColumn, columns: ColumnaRegistro[]): number {
+  return roundHours(days.reduce((total, day) => total + getDayTotal(hours, columns, day.date), 0));
+}
+
+export interface TotalesPorCategoria {
+  ordinarias: number;
+  extraordinarias: number;
+  ausencias: number;
+}
+
+export function getTotalesPorCategoria(
+  hours: HoursByDateAndColumn,
+  columns: ColumnaRegistro[],
+): TotalesPorCategoria {
+  let ordinarias = 0;
+  let extraordinarias = 0;
+  let ausencias = 0;
+
+  for (const columna of columns) {
+    const total = getColumnTotal(hours, columna.id);
+    if (columna.esHoraExtra) {
+      extraordinarias += total;
+    } else if (columna.categoria === "AUSENCIA") {
+      ausencias += total;
+    } else {
+      ordinarias += total;
+    }
+  }
+
+  return {
+    ordinarias: roundHours(ordinarias),
+    extraordinarias: roundHours(extraordinarias),
+    ausencias: roundHours(ausencias),
+  };
+}
+
+/** Máximo permitido para una columna sin exceder el tope diario entre todas las columnas. */
 export function getMaxForInput(
-  hours: HoursByDateAndCenter,
-  selectedCenterIds: string[],
+  hours: HoursByDateAndColumn,
+  columnIds: string[],
   date: string,
-  centerId: string,
+  columnId: string,
 ): number {
   const dayHours = hours[date] ?? {};
-  const otherHours = selectedCenterIds
-    .filter((id) => id !== centerId)
+  const otherHours = columnIds
+    .filter((id) => id !== columnId)
     .reduce((total, id) => total + Number(dayHours[id] || 0), 0);
 
   return Math.max(0, roundHours(MAX_DAILY_HOURS - otherHours));
 }
 
-export function findPreviousEditableDate(days: DayInfo[], date: string): string | null {
-  const currentIndex = days.findIndex((day) => day.date === date);
-
-  for (let index = currentIndex - 1; index >= 0; index -= 1) {
-    if (!days[index].weekend) {
-      return days[index].date;
-    }
-  }
-
-  return null;
-}
-
-export function getPreviousPeriod(period: string): string {
-  const [year, month] = period.split("-").map(Number);
-  const previous = new Date(year, month - 2, 1);
-  return `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, "0")}`;
-}
-
 export function buildCsvRows(
   days: DayInfo[],
-  centers: CostCenter[],
-  hours: HoursByDateAndCenter,
-  observations: ObservationsByDate,
+  columns: ColumnaRegistro[],
+  hours: HoursByDateAndColumn,
 ): string[][] {
-  const header = [
-    "Día",
-    ...centers.map((center) => `${center.id} - ${center.name}`),
-    "Total diario",
-    "Observaciones",
-  ];
+  const header = ["Día", ...columns.map((col) => `${col.codigo} - ${col.etiqueta}`), "Total diario"];
 
   const rows = days.map((day) => [
     day.label,
-    ...centers.map((center) => Number(hours[day.date]?.[center.id] || 0).toString().replace(".", ",")),
-    formatHours(getDayTotal(hours, centers, day.date)),
-    observations[day.date] || "",
+    ...columns.map((col) => Number(hours[day.date]?.[col.id] || 0).toString().replace(".", ",")),
+    formatHours(getDayTotal(hours, columns, day.date)),
   ]);
 
   const totalsRow = [
     "TOTAL",
-    ...centers.map((center) => formatHours(getColumnTotal(hours, center.id))),
-    formatHours(getRegisteredHours(days, hours, centers)),
-    "",
+    ...columns.map((col) => formatHours(getColumnTotal(hours, col.id))),
+    formatHours(getWeekTotal(days, hours, columns)),
   ];
 
   return [header, ...rows, totalsRow];
