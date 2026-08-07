@@ -88,7 +88,7 @@ export function LoginForm() {
   };
 
   return (
-    <article className="w-full max-w-[40rem] rounded-card border border-krontec-gray/60 bg-white/97 p-10 shadow-card sm:p-12">
+    <article className="w-full max-w-[40rem] rounded-card border border-krontec-gray/60 bg-white/97 p-6 shadow-card sm:p-10 lg:p-12">
       <header className="mb-8 text-center">
         <div className="mx-auto mb-4 grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full bg-gradient-to-br from-krontec-sky/20 to-krontec-violet/15 text-krontec-blue">
           <Clock className="h-9 w-9" aria-hidden />

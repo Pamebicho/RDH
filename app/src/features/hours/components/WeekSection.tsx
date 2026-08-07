@@ -56,7 +56,6 @@ export function WeekSection({ trabajadorId, semana, columns }: WeekSectionProps)
             isSubmitting={week.isSubmitting}
             onSave={week.save}
             onSubmit={week.submit}
-            onExport={week.exportCsv}
           />
         </>
       )}

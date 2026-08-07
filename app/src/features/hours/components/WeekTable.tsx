@@ -20,6 +20,27 @@ interface WeekTableProps {
 const stickyHeadCell = "sticky top-0 bg-[#fbfcfe] shadow-[inset_0_-1px_0_#dfe5ee]";
 const stickyFirstCol = "sticky left-0 min-w-[82px] w-[82px] bg-[#fbfcfe] text-center";
 
+// Solo se permite cargar horas con las flechitas del campo numérico (o las flechas del
+// teclado), no escribiendo directamente: se bloquea cualquier tecla que no sea de
+// navegación/incremento, y también pegar texto.
+const TECLAS_PERMITIDAS = new Set([
+  "ArrowUp",
+  "ArrowDown",
+  "Tab",
+  "Shift",
+  "Control",
+  "Alt",
+  "Meta",
+  "Escape",
+  "Enter",
+]);
+
+function bloquearEscritura(event: React.KeyboardEvent<HTMLInputElement>) {
+  if (!TECLAS_PERMITIDAS.has(event.key)) {
+    event.preventDefault();
+  }
+}
+
 export function WeekTable({
   days,
   columns,
@@ -78,14 +99,20 @@ export function WeekTable({
                   key={day.date}
                   className={cn(
                     "border-b border-[#e1e7ef]",
-                    day.weekend && "bg-[#fcfcfd]",
+                    (day.weekend || day.feriado) && "bg-[#fcfcfd]",
                     isActive && "bg-[#f1f7ff]",
-                    !day.weekend && !isActive && "hover:bg-[#f8fbff]",
+                    !day.weekend && !day.feriado && !isActive && "hover:bg-[#f8fbff]",
                   )}
                 >
                   <th
                     scope="row"
-                    className={cn(stickyFirstCol, "z-[3] px-3 py-2.5 font-normal", day.weekend && "text-[#d32f2f]")}
+                    title={day.feriado ? "Feriado" : undefined}
+                    className={cn(
+                      stickyFirstCol,
+                      "z-[3] px-3 py-2.5 font-normal",
+                      (day.weekend || day.feriado) && "text-[#d32f2f]",
+                      day.feriado && "font-semibold",
+                    )}
                   >
                     {day.label}
                   </th>
@@ -101,6 +128,8 @@ export function WeekTable({
                         disabled={inputsDisabled}
                         onFocus={() => onSetActiveDate(day.date)}
                         onChange={(event) => onSetHour(day.date, columna.id, Number(event.target.value || 0))}
+                        onKeyDown={bloquearEscritura}
+                        onPaste={(event) => event.preventDefault()}
                         aria-label={`Horas del ${day.label} en ${columna.codigo} ${columna.etiqueta}`}
                         className="form-input min-w-[92px] py-1.5 text-center"
                       />

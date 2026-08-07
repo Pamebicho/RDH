@@ -2,12 +2,20 @@
 
 export const MAX_DAILY_HOURS = 24;
 
+/**
+ * Centros de costo que siempre están disponibles para todos los trabajadores, en todos los
+ * períodos: no se pueden quitar desde el selector de "Centros de costo" (solo se pueden agregar
+ * otros además de estos).
+ */
+export const FIXED_COST_CENTER_CODES = ["20-004", "20-009", "20-013", "20-015", "20-020"] as const;
+
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] as const;
 
 export interface DayInfo {
   date: string;
   label: string;
   weekend: boolean;
+  feriado: boolean;
 }
 
 /** Una columna de la tabla semanal: un proyecto (horas ordinarias) o un tipo de registro sin proyecto. */
@@ -61,17 +69,23 @@ export function formatPercent(value: number): string {
 }
 
 /** Genera los días (inclusive) entre fechaInicio y fechaFin de una semana. */
-export function createWeekDays(fechaInicio: string, fechaFin: string): DayInfo[] {
+export function createWeekDays(
+  fechaInicio: string,
+  fechaFin: string,
+  feriados: ReadonlySet<string> = new Set(),
+): DayInfo[] {
   const start = parseIsoDate(fechaInicio);
   const end = parseIsoDate(fechaFin);
   const days: DayInfo[] = [];
 
   for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
     const weekday = cursor.getDay();
+    const date = formatIsoDate(cursor);
     days.push({
-      date: formatIsoDate(cursor),
+      date,
       label: `${String(cursor.getDate()).padStart(2, "0")} ${WEEKDAYS[weekday]}`,
       weekend: weekday === 0 || weekday === 6,
+      feriado: feriados.has(date),
     });
   }
 
@@ -183,4 +197,49 @@ export function buildCsvRows(
 
 export function rowsToCsv(rows: string[][]): string {
   return rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
+}
+
+export interface SemanaConDias {
+  numeroSemana: number;
+  days: DayInfo[];
+}
+
+/** Exporta TODO el período (todas sus semanas), aunque algunas no tengan horas cargadas. */
+export function buildCsvRowsPeriodo(
+  semanas: SemanaConDias[],
+  columns: ColumnaRegistro[],
+  hours: HoursByDateAndColumn,
+): string[][] {
+  const header = ["Semana", "Día", ...columns.map((col) => `${col.codigo} - ${col.etiqueta}`), "Total diario"];
+  const rows: string[][] = [header];
+
+  for (const semana of semanas) {
+    for (const day of semana.days) {
+      rows.push([
+        `Semana ${semana.numeroSemana}`,
+        day.label,
+        ...columns.map((col) => Number(hours[day.date]?.[col.id] || 0).toString().replace(".", ",")),
+        formatHours(getDayTotal(hours, columns, day.date)),
+      ]);
+    }
+
+    rows.push([
+      `Semana ${semana.numeroSemana}`,
+      "TOTAL SEMANA",
+      ...columns.map((col) =>
+        formatHours(roundHours(semana.days.reduce((total, day) => total + Number(hours[day.date]?.[col.id] || 0), 0))),
+      ),
+      formatHours(getWeekTotal(semana.days, hours, columns)),
+    ]);
+  }
+
+  const todosLosDias = semanas.flatMap((semana) => semana.days);
+  rows.push([
+    "TOTAL PERÍODO",
+    "",
+    ...columns.map((col) => formatHours(getColumnTotal(hours, col.id))),
+    formatHours(getWeekTotal(todosLosDias, hours, columns)),
+  ]);
+
+  return rows;
 }

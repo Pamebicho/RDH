@@ -1,23 +1,27 @@
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { RegistroHoras, Semana } from "@/types/database.types";
+import type { Periodo, RegistroHoras, Semana } from "@/types/database.types";
 import {
   ensurePlanilla,
   fetchFeriados,
   fetchHorasEsperadasPorDia,
   fetchPeriodos,
   fetchProyectosActivos,
+  fetchProyectosSeleccionadosIds,
   fetchRegistros,
+  fetchRegistrosPeriodo,
   fetchSemanas,
   fetchTiposRegistroActivos,
   submitPlanilla,
+  updateProyectosSeleccionados,
   upsertRegistros,
   type RegistroUpsert,
 } from "./api";
 import {
-  buildCsvRows,
+  buildCsvRowsPeriodo,
   createWeekDays,
+  FIXED_COST_CENTER_CODES,
   formatHours,
   getColumnTotal,
   getDayTotal,
@@ -44,48 +48,113 @@ export function useSemanas(periodoId: string | undefined) {
 }
 
 /**
- * Columnas de la tabla semanal: los centros de costo son fijos para todos los trabajadores en
- * todos los períodos (no hay selección por trabajador/período), más un tipo de registro sin
- * proyecto por cada tipo que no lo requiera (extraordinarias, vacaciones, licencia, etc.).
+ * Centros de costo (proyectos) que el trabajador eligió explícitamente para este período.
+ * Si no ha elegido ninguno (caso por defecto) queda una lista vacía y `useColumnas` cae en
+ * mostrar todos los proyectos activos, que hoy son los 5 fijos.
  */
-export function useColumnas() {
+export function useProyectosSeleccionados(trabajadorId: string | undefined, periodoId: string | undefined) {
+  return useQuery({
+    queryKey: ["proyectos-seleccionados", trabajadorId, periodoId],
+    queryFn: () => fetchProyectosSeleccionadosIds(trabajadorId as string, periodoId as string),
+    enabled: Boolean(trabajadorId && periodoId),
+  });
+}
+
+export function useUpdateProyectosSeleccionados(trabajadorId: string | undefined, periodoId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (proyectoIds: string[]) =>
+      updateProyectosSeleccionados(trabajadorId as string, periodoId as string, proyectoIds),
+    onSuccess: () => {
+      toast.success("Centros de costo actualizados.");
+      void queryClient.invalidateQueries({ queryKey: ["proyectos-seleccionados", trabajadorId, periodoId] });
+    },
+    onError: () => {
+      toast.error("No fue posible actualizar los centros de costo.");
+    },
+  });
+}
+
+/**
+ * Columnas de la tabla semanal: solo centros de costo (proyectos), sin columnas de tipos de
+ * registro (horas extra, vacaciones, licencia, permiso, ausencia). Los 5 centros de costo fijos
+ * (`FIXED_COST_CENTER_CODES`) siempre están presentes; el resto de proyectos activos solo
+ * aparece si el trabajador los eligió explícitamente para este período.
+ */
+export function useColumnas(proyectosSeleccionadosIds?: string[]) {
   const proyectosQuery = useQuery({ queryKey: ["proyectos-activos"], queryFn: fetchProyectosActivos });
   const tiposQuery = useQuery({ queryKey: ["tipos-registro-activos"], queryFn: fetchTiposRegistroActivos });
 
   const columnas = useMemo<ColumnaRegistro[]>(() => {
     const tipoOrd = tiposQuery.data?.find((tipo) => tipo.codigo === "ORD");
+    if (!tipoOrd) return [];
 
-    const columnasProyecto: ColumnaRegistro[] = tipoOrd
-      ? (proyectosQuery.data ?? []).map((proyecto) => ({
-          id: proyecto.id,
-          tipoRegistroId: tipoOrd.id,
-          proyectoId: proyecto.id,
-          codigo: proyecto.codigo,
-          etiqueta: proyecto.nombre,
-          categoria: tipoOrd.categoria,
-          esHoraExtra: tipoOrd.es_hora_extra,
-        }))
-      : [];
+    const proyectosBase = proyectosQuery.data ?? [];
+    const fijos = proyectosBase.filter((proyecto) =>
+      (FIXED_COST_CENTER_CODES as readonly string[]).includes(proyecto.codigo),
+    );
+    const seleccionadosExtra = proyectosBase.filter(
+      (proyecto) =>
+        !(FIXED_COST_CENTER_CODES as readonly string[]).includes(proyecto.codigo) &&
+        (proyectosSeleccionadosIds ?? []).includes(proyecto.id),
+    );
 
-    const columnasSinProyecto: ColumnaRegistro[] = (tiposQuery.data ?? [])
-      .filter((tipo) => !tipo.requiere_proyecto)
-      .map((tipo) => ({
-        id: tipo.codigo,
-        tipoRegistroId: tipo.id,
-        proyectoId: null,
-        codigo: tipo.codigo,
-        etiqueta: tipo.nombre,
-        categoria: tipo.categoria,
-        esHoraExtra: tipo.es_hora_extra,
-      }));
-
-    return [...columnasProyecto, ...columnasSinProyecto];
-  }, [proyectosQuery.data, tiposQuery.data]);
+    return [...fijos, ...seleccionadosExtra].map((proyecto) => ({
+      id: proyecto.id,
+      tipoRegistroId: tipoOrd.id,
+      proyectoId: proyecto.id,
+      codigo: proyecto.codigo,
+      etiqueta: proyecto.nombre,
+      categoria: tipoOrd.categoria,
+      esHoraExtra: tipoOrd.es_hora_extra,
+    }));
+  }, [proyectosQuery.data, tiposQuery.data, proyectosSeleccionadosIds]);
 
   return {
     columnas,
+    proyectosDisponibles: proyectosQuery.data ?? [],
     isLoading: proyectosQuery.isLoading || tiposQuery.isLoading,
+    refetchProyectos: proyectosQuery.refetch,
   };
+}
+
+/** Exporta a CSV TODAS las semanas de un período, tengan o no horas cargadas. */
+export function useExportarPeriodo(
+  trabajadorId: string | undefined,
+  periodo: Periodo | undefined,
+  semanas: Semana[],
+  columns: ColumnaRegistro[],
+) {
+  return useMutation({
+    mutationFn: async () => {
+      if (!trabajadorId || !periodo) return;
+
+      const registros = await fetchRegistrosPeriodo(trabajadorId, periodo.fecha_inicio, periodo.fecha_fin);
+      const hours = mapRegistrosToHours(registros, columns);
+      const semanasConDias = semanas.map((semana) => ({
+        numeroSemana: semana.numero_semana,
+        days: createWeekDays(semana.fecha_inicio, semana.fecha_fin),
+      }));
+
+      const csv = rowsToCsv(buildCsvRowsPeriodo(semanasConDias, columns, hours));
+      const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `registro-horas-${periodo.nombre.replaceAll(" ", "-").toLowerCase()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    },
+    onSuccess: () => {
+      toast.success("Se descargó el período completo en un archivo CSV compatible con Microsoft Excel.");
+    },
+    onError: () => {
+      toast.error("No fue posible exportar el período.");
+    },
+  });
 }
 
 function mapRegistrosToHours(registros: RegistroHoras[], columns: ColumnaRegistro[]): HoursByDateAndColumn {
@@ -114,7 +183,16 @@ function mapRegistrosToHours(registros: RegistroHoras[], columns: ColumnaRegistr
 /** Estado y acciones de la tabla de UNA semana (planilla semanal) para el trabajador actual. */
 export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana, columns: ColumnaRegistro[]) {
   const queryClient = useQueryClient();
-  const days = useMemo(() => createWeekDays(semana.fecha_inicio, semana.fecha_fin), [semana.fecha_inicio, semana.fecha_fin]);
+
+  const feriadosQuery = useQuery({
+    queryKey: ["feriados", semana.fecha_inicio, semana.fecha_fin],
+    queryFn: () => fetchFeriados(semana.fecha_inicio, semana.fecha_fin),
+  });
+
+  const days = useMemo(
+    () => createWeekDays(semana.fecha_inicio, semana.fecha_fin, feriadosQuery.data),
+    [semana.fecha_inicio, semana.fecha_fin, feriadosQuery.data],
+  );
 
   const planillaQuery = useQuery({
     queryKey: ["planilla", trabajadorId, semana.id],
@@ -135,11 +213,6 @@ export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana
     queryKey: ["horas-esperadas", trabajadorId, semana.fecha_inicio],
     queryFn: () => fetchHorasEsperadasPorDia(trabajadorId as string, semana.fecha_inicio),
     enabled: Boolean(trabajadorId),
-  });
-
-  const feriadosQuery = useQuery({
-    queryKey: ["feriados", semana.fecha_inicio, semana.fecha_fin],
-    queryFn: () => fetchFeriados(semana.fecha_inicio, semana.fecha_fin),
   });
 
   const [draft, dispatch] = useReducer(weekDraftReducer, initialWeekDraft);
@@ -220,21 +293,6 @@ export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana
     dispatch({ type: "set-active-date", date });
   }
 
-  function exportCsv() {
-    const rows = buildCsvRows(days, columns, draft.hours);
-    const csv = rowsToCsv(rows);
-    const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `registro-horas-semana-${semana.numero_semana}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    toast.success("Se descargó un archivo CSV compatible con Microsoft Excel.");
-  }
-
   return {
     isLoading: planillaQuery.isLoading || registrosQuery.isLoading || horasEsperadasQuery.isLoading,
     days,
@@ -255,6 +313,5 @@ export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana
     isSaving: saveMutation.isPending,
     submit: () => submitMutation.mutate(),
     isSubmitting: submitMutation.isPending,
-    exportCsv,
   };
 }

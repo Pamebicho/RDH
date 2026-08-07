@@ -51,32 +51,34 @@ export function ReportsPage() {
             No hay datos visibles para tu alcance en este período.
           </div>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Trabajador</th>
-                <th className="px-4 py-3 text-right font-semibold">Ordinarias</th>
-                <th className="px-4 py-3 text-right font-semibold">Extra</th>
-                <th className="px-4 py-3 text-right font-semibold">Ausencias</th>
-                <th className="px-4 py-3 text-right font-semibold">Total</th>
-                <th className="px-4 py-3 text-right font-semibold">Enviadas</th>
-                <th className="px-4 py-3 text-right font-semibold">Aprobadas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filas.map((fila) => (
-                <tr key={fila.trabajadorId} className="border-t border-[#e5eaf1]">
-                  <td className="px-4 py-3 font-medium text-ink">{fila.nombre}</td>
-                  <td className="px-4 py-3 text-right">{formatHours(fila.ordinarias)}</td>
-                  <td className="px-4 py-3 text-right">{formatHours(fila.extraordinarias)}</td>
-                  <td className="px-4 py-3 text-right">{formatHours(fila.ausencias)}</td>
-                  <td className="px-4 py-3 text-right font-semibold">{formatHours(fila.total)}</td>
-                  <td className="px-4 py-3 text-right text-ink-muted">{fila.planillasEnviadas}</td>
-                  <td className="px-4 py-3 text-right text-ink-muted">{fila.planillasAprobadas}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Trabajador</th>
+                  <th className="px-4 py-3 text-right font-semibold">Ordinarias</th>
+                  <th className="px-4 py-3 text-right font-semibold">Extra</th>
+                  <th className="px-4 py-3 text-right font-semibold">Ausencias</th>
+                  <th className="px-4 py-3 text-right font-semibold">Total</th>
+                  <th className="px-4 py-3 text-right font-semibold">Enviadas</th>
+                  <th className="px-4 py-3 text-right font-semibold">Aprobadas</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filas.map((fila) => (
+                  <tr key={fila.trabajadorId} className="border-t border-[#e5eaf1]">
+                    <td className="px-4 py-3 font-medium text-ink">{fila.nombre}</td>
+                    <td className="px-4 py-3 text-right">{formatHours(fila.ordinarias)}</td>
+                    <td className="px-4 py-3 text-right">{formatHours(fila.extraordinarias)}</td>
+                    <td className="px-4 py-3 text-right">{formatHours(fila.ausencias)}</td>
+                    <td className="px-4 py-3 text-right font-semibold">{formatHours(fila.total)}</td>
+                    <td className="px-4 py-3 text-right text-ink-muted">{fila.planillasEnviadas}</td>
+                    <td className="px-4 py-3 text-right text-ink-muted">{fila.planillasAprobadas}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </AppShell>

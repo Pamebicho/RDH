@@ -55,9 +55,17 @@ describe("createWeekDays", () => {
     const days = createWeekDays("2026-07-27", "2026-08-02");
 
     expect(days).toHaveLength(7);
-    expect(days[0]).toEqual({ date: "2026-07-27", label: "27 Lun", weekend: false });
-    expect(days[5]).toEqual({ date: "2026-08-01", label: "01 Sáb", weekend: true });
-    expect(days[6]).toEqual({ date: "2026-08-02", label: "02 Dom", weekend: true });
+    expect(days[0]).toEqual({ date: "2026-07-27", label: "27 Lun", weekend: false, feriado: false });
+    expect(days[5]).toEqual({ date: "2026-08-01", label: "01 Sáb", weekend: true, feriado: false });
+    expect(days[6]).toEqual({ date: "2026-08-02", label: "02 Dom", weekend: true, feriado: false });
+  });
+
+  it("marca como feriado los días presentes en el set de feriados", () => {
+    const days = createWeekDays("2026-07-27", "2026-08-02", new Set(["2026-07-29"]));
+    const feriado = days.find((day) => day.date === "2026-07-29");
+
+    expect(feriado?.feriado).toBe(true);
+    expect(days.filter((day) => day.feriado)).toHaveLength(1);
   });
 });
 

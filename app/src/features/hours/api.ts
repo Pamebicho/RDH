@@ -47,6 +47,65 @@ export async function fetchTiposRegistroActivos(): Promise<TipoRegistro[]> {
   return data ?? [];
 }
 
+/**
+ * Centros de costo elegidos por el trabajador para un período puntual. Si no hay ninguno
+ * guardado (caso normal) se usan todos los proyectos activos, que hoy son los 5 fijos.
+ */
+export async function fetchProyectosSeleccionadosIds(trabajadorId: string, periodoId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("trabajador_proyectos_periodo")
+    .select("proyecto_id")
+    .eq("trabajador_id", trabajadorId)
+    .eq("periodo_id", periodoId)
+    .eq("activo", true);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.proyecto_id);
+}
+
+export async function updateProyectosSeleccionados(
+  trabajadorId: string,
+  periodoId: string,
+  proyectoIds: string[],
+): Promise<void> {
+  const { error: deleteError } = await supabase
+    .from("trabajador_proyectos_periodo")
+    .delete()
+    .eq("trabajador_id", trabajadorId)
+    .eq("periodo_id", periodoId);
+
+  if (deleteError) throw deleteError;
+  if (!proyectoIds.length) return;
+
+  const { error: insertError } = await supabase.from("trabajador_proyectos_periodo").insert(
+    proyectoIds.map((proyecto_id, index) => ({
+      trabajador_id: trabajadorId,
+      periodo_id: periodoId,
+      proyecto_id,
+      orden_visual: index,
+    })),
+  );
+
+  if (insertError) throw insertError;
+}
+
+export async function fetchRegistrosPeriodo(
+  trabajadorId: string,
+  fechaInicio: string,
+  fechaFin: string,
+): Promise<RegistroHoras[]> {
+  const { data, error } = await supabase
+    .from("registros_horas")
+    .select("*")
+    .eq("trabajador_id", trabajadorId)
+    .eq("anulado", false)
+    .gte("fecha", fechaInicio)
+    .lte("fecha", fechaFin);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Horas esperadas por día de semana según la jornada vigente del trabajador (o "ESTANDAR" si no tiene asignada). */
 export async function fetchHorasEsperadasPorDia(
   trabajadorId: string,

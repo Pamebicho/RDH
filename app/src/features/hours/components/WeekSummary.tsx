@@ -1,4 +1,4 @@
-import { FileSpreadsheet, Save, Send } from "lucide-react";
+import { Save, Send } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { PlanillaEstado } from "@/types/database.types";
@@ -16,7 +16,6 @@ interface WeekSummaryProps {
   isSubmitting: boolean;
   onSave: () => void;
   onSubmit: () => void;
-  onExport: () => void;
 }
 
 export function WeekSummary({
@@ -31,7 +30,6 @@ export function WeekSummary({
   isSubmitting,
   onSave,
   onSubmit,
-  onExport,
 }: WeekSummaryProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[#e3e8f0] bg-[#fbfcfe] px-4 py-3.5">
@@ -61,10 +59,6 @@ export function WeekSummary({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={onExport} className="btn-outline min-h-[40px] px-3 text-sm">
-          <FileSpreadsheet className="h-4 w-4 text-success" aria-hidden />
-          <span>Exportar</span>
-        </button>
         <Button
           type="button"
           variant="outline"

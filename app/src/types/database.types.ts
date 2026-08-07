@@ -76,7 +76,7 @@ export interface Database {
           correo_corporativo: string;
           cargo_id: string | null;
           area_id: string | null;
-          jefe_contrato_id: string | null;
+          jefatura: string | null;
           fecha_ingreso: string | null;
           activo: boolean;
           creado_en: string;
@@ -91,7 +91,7 @@ export interface Database {
           correo_corporativo: string;
           cargo_id?: string | null;
           area_id?: string | null;
-          jefe_contrato_id?: string | null;
+          jefatura?: string | null;
           fecha_ingreso?: string | null;
           activo?: boolean;
         };

@@ -82,12 +82,18 @@ create table if not exists public.trabajadores (
   correo_corporativo varchar(150) not null unique,
   cargo_id uuid references public.cargos (id),
   area_id uuid references public.areas (id),
-  jefe_contrato_id uuid references public.trabajadores (id),
+  jefatura varchar(150),
   fecha_ingreso date,
   activo boolean not null default true,
   creado_en timestamptz not null default now(),
   actualizado_en timestamptz not null default now()
 );
+
+-- Migración: reemplaza el antiguo jefe_contrato_id (FK a otro trabajador, vía selector) por un
+-- campo de texto libre "Jefatura" (se escribe el nombre, no se elige de una lista).
+alter table public.trabajadores drop column if exists jefe_contrato_id;
+alter table public.trabajadores drop column if exists administrador_contrato;
+alter table public.trabajadores add column if not exists jefatura varchar(150);
 
 create unique index if not exists idx_trabajadores_auth_user on public.trabajadores (auth_user_id);
 
@@ -162,8 +168,13 @@ create table if not exists public.semanas (
 
 create index if not exists idx_semanas_periodo on public.semanas (periodo_id);
 
--- Genera las semanas (lunes a domingo) que cubren un período; se puede volver a
--- llamar para regenerar (borra y vuelve a crear las semanas de ese período).
+-- Genera las semanas que cubren un período; se puede volver a llamar para regenerar.
+-- Cada semana se muestra completa de lunes a domingo (7 días), aunque la primera o la
+-- última se asomen un poco fuera de las fechas exactas del período — así el trabajador
+-- siempre ve la semana entera en vez de un tramo cortado de 2 o 3 días.
+-- Las semanas que ya tienen una planilla_semanal cargada NO se borran (rompería la FK
+-- y perdería datos): esas se actualizan in-place (mismo id, fechas nuevas) vía upsert
+-- por (periodo_id, numero_semana); solo se eliminan las semanas "vacías" sobrantes.
 create or replace function public.generar_semanas_periodo(p_periodo_id uuid)
 returns void
 language plpgsql
@@ -181,16 +192,59 @@ begin
     raise exception 'Periodo % no encontrado', p_periodo_id;
   end if;
 
-  delete from public.semanas where periodo_id = p_periodo_id;
+  delete from public.semanas s
+  where s.periodo_id = p_periodo_id
+    and not exists (select 1 from public.planillas_semanales p where p.semana_id = s.id);
 
   v_cursor_lunes := v_inicio - ((extract(isodow from v_inicio)::int - 1));
 
   while v_cursor_lunes <= v_fin loop
     insert into public.semanas (periodo_id, numero_semana, fecha_inicio, fecha_fin)
-    values (p_periodo_id, v_numero, v_cursor_lunes, v_cursor_lunes + 6);
+    values (p_periodo_id, v_numero, v_cursor_lunes, v_cursor_lunes + 6)
+    on conflict (periodo_id, numero_semana)
+    do update set fecha_inicio = excluded.fecha_inicio, fecha_fin = excluded.fecha_fin;
+
     v_cursor_lunes := v_cursor_lunes + 7;
     v_numero := v_numero + 1;
   end loop;
+end;
+$$;
+
+-- Crea (o actualiza) el período mensual con ciclo fijo "día 25 al día 24 del mes
+-- siguiente" que contiene la fecha dada, y genera sus semanas. p_fecha puede ser
+-- cualquier día dentro del ciclo deseado.
+create or replace function public.generar_periodo_ciclo_25_24(p_fecha date)
+returns uuid
+language plpgsql
+as $$
+declare
+  v_inicio date;
+  v_fin date;
+  v_nombre_mes text;
+  v_id uuid;
+begin
+  if extract(day from p_fecha) >= 25 then
+    v_inicio := make_date(extract(year from p_fecha)::int, extract(month from p_fecha)::int, 25);
+  else
+    v_inicio := make_date(extract(year from p_fecha)::int, extract(month from p_fecha)::int, 25) - interval '1 month';
+  end if;
+
+  v_fin := (v_inicio + interval '1 month' - interval '1 day')::date;
+
+  -- Nombre en español fijo (no depende del locale configurado en el servidor de Postgres).
+  v_nombre_mes := (array[
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ])[extract(month from v_fin)::int] || ' ' || extract(year from v_fin)::text;
+
+  insert into public.periodos (nombre, fecha_inicio, fecha_fin, estado, creado_automaticamente)
+  values (v_nombre_mes, v_inicio, v_fin, 'ABIERTO', true)
+  on conflict (nombre) do update set fecha_inicio = excluded.fecha_inicio, fecha_fin = excluded.fecha_fin
+  returning id into v_id;
+
+  perform public.generar_semanas_periodo(v_id);
+
+  return v_id;
 end;
 $$;
 
@@ -538,6 +592,12 @@ $$;
 -- =============================================================================
 -- Trigger: crear trabajador + rol TRABAJADOR al registrarse en Supabase Auth
 -- =============================================================================
+-- Un Super Admin puede pre-crear la fila de un trabajador (con RUT, área, cargo, roles, etc.)
+-- antes de que esa persona tenga cuenta de acceso (auth_user_id queda null). Cuando esa persona
+-- inicia sesión por primera vez con ese mismo correo, este trigger "reclama" esa fila existente
+-- (le asigna el auth_user_id) en vez de fallar por el UNIQUE de correo_corporativo. Solo asigna
+-- el rol TRABAJADOR por defecto si el trabajador todavía no tiene ningún rol asignado (para no
+-- pisar los roles que un Super Admin ya haya elegido al pre-crearlo).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -546,16 +606,24 @@ as $$
 declare
   v_trabajador_id uuid;
   v_rol_trabajador_id uuid;
+  v_tiene_roles boolean;
 begin
   insert into public.trabajadores (auth_user_id, correo_corporativo)
   values (new.id, new.email)
+  on conflict (correo_corporativo) do update set auth_user_id = excluded.auth_user_id
   returning id into v_trabajador_id;
 
-  select id into v_rol_trabajador_id from public.roles where codigo = 'TRABAJADOR';
+  select exists(
+    select 1 from public.trabajador_roles where trabajador_id = v_trabajador_id
+  ) into v_tiene_roles;
 
-  if v_rol_trabajador_id is not null then
-    insert into public.trabajador_roles (trabajador_id, rol_id, activo)
-    values (v_trabajador_id, v_rol_trabajador_id, true);
+  if not v_tiene_roles then
+    select id into v_rol_trabajador_id from public.roles where codigo = 'TRABAJADOR';
+
+    if v_rol_trabajador_id is not null then
+      insert into public.trabajador_roles (trabajador_id, rol_id, activo)
+      values (v_trabajador_id, v_rol_trabajador_id, true);
+    end if;
   end if;
 
   return new;
@@ -889,6 +957,24 @@ cross join (values
 where j.codigo = 'ESTANDAR'
 on conflict (jornada_id, dia_semana) do update set horas_esperadas = excluded.horas_esperadas;
 
+-- Feriados oficiales de Chile 2026 (solo los de fecha fija; Viernes Santo y Sábado Santo
+-- cambian cada año según la Pascua y se pueden agregar a mano desde Configuración > Feriados).
+insert into public.feriados (fecha, nombre, tipo) values
+  ('2026-01-01', 'Año Nuevo', 'FIJO'),
+  ('2026-05-01', 'Día Nacional del Trabajo', 'FIJO'),
+  ('2026-05-21', 'Día de las Glorias Navales', 'FIJO'),
+  ('2026-06-29', 'San Pedro y San Pablo', 'FIJO'),
+  ('2026-07-16', 'Virgen del Carmen', 'FIJO'),
+  ('2026-08-15', 'Asunción de la Virgen', 'FIJO'),
+  ('2026-09-18', 'Independencia Nacional', 'FIJO'),
+  ('2026-09-19', 'Glorias del Ejército', 'FIJO'),
+  ('2026-10-12', 'Encuentro de Dos Mundos', 'FIJO'),
+  ('2026-10-31', 'Día de las Iglesias Evangélicas y Protestantes', 'FIJO'),
+  ('2026-11-01', 'Día de Todos los Santos', 'FIJO'),
+  ('2026-12-08', 'Inmaculada Concepción', 'FIJO'),
+  ('2026-12-25', 'Navidad', 'FIJO')
+on conflict (fecha) do update set nombre = excluded.nombre, tipo = excluded.tipo, activo = true;
+
 -- Centros de costo fijos: los mismos para todos los trabajadores, en todos los períodos
 -- (no hay selección por trabajador/período). Se desactivan los de ejemplo de la v1 que ya
 -- no aplican, sin borrarlos (por si ya hay registros_horas/asignaciones que los referencian).
@@ -903,16 +989,18 @@ insert into public.proyectos (codigo, nombre) values
   ('20-020', 'Gest. Ofertas Técnicas')
 on conflict (codigo) do update set nombre = excluded.nombre, activo = true;
 
--- Período de ejemplo (ciclo 25 a 24) y sus semanas, para poder probar el flujo completo.
-insert into public.periodos (nombre, fecha_inicio, fecha_fin, estado, fecha_limite_administrador, creado_automaticamente)
-values ('Agosto 2026', '2026-07-25', '2026-08-24', 'ABIERTO', '2026-08-27', true)
-on conflict (nombre) do update set
-  fecha_inicio = excluded.fecha_inicio,
-  fecha_fin = excluded.fecha_fin,
-  estado = excluded.estado,
-  fecha_limite_administrador = excluded.fecha_limite_administrador;
+-- Limpieza puntual: se quitan del selector los períodos ya generados de meses que dejaron de
+-- interesar (mayo/junio/julio 2026), siempre que no tengan una planilla cargada (si alguien ya
+-- registró horas ahí, se conserva para no perder datos).
+delete from public.periodos p
+where p.creado_automaticamente = true
+  and p.nombre in ('Mayo 2026', 'Junio 2026', 'Julio 2026')
+  and not exists (select 1 from public.planillas_semanales ps where ps.periodo_id = p.id);
 
-select public.generar_semanas_periodo(id) from public.periodos where nombre = 'Agosto 2026';
+-- Períodos con ciclo fijo "25 al 24" desde el mes actual hasta 4 meses adelante (sin meses
+-- pasados), cada uno con sus semanas completas (lunes a domingo) ya generadas.
+select public.generar_periodo_ciclo_25_24((current_date + (n || ' months')::interval)::date)
+from generate_series(0, 4) as n;
 
 -- =============================================================================
 -- Backfill: usuarios de Supabase Auth creados antes de este esquema (con el

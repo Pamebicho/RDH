@@ -22,8 +22,8 @@ export function Modal({ open, onOpenChange, title, description, children, footer
             size === "lg" ? "max-w-2xl" : "max-w-md"
           }`}
         >
-          <header className="flex items-start justify-between gap-4 border-b border-[#e7ecf3] px-6 py-5">
-            <div>
+          <header className="flex items-start justify-between gap-4 border-b border-[#e7ecf3] px-4 py-4 sm:px-6 sm:py-5">
+            <div className="min-w-0">
               <Dialog.Title className="text-lg font-semibold text-ink">{title}</Dialog.Title>
               {description ? (
                 <Dialog.Description className="mt-1 text-sm text-ink-muted">
@@ -33,16 +33,16 @@ export function Modal({ open, onOpenChange, title, description, children, footer
             </div>
             <Dialog.Close
               aria-label="Cerrar"
-              className="rounded-full p-1 text-ink-muted transition-colors hover:bg-bg hover:text-ink"
+              className="shrink-0 rounded-full p-1 text-ink-muted transition-colors hover:bg-bg hover:text-ink"
             >
               <X className="h-5 w-5" />
             </Dialog.Close>
           </header>
 
-          <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
+          <div className="max-h-[70vh] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>
 
           {footer ? (
-            <footer className="flex justify-end gap-3 border-t border-[#e7ecf3] px-6 py-4">
+            <footer className="flex flex-wrap justify-end gap-2 border-t border-[#e7ecf3] px-4 py-4 sm:gap-3 sm:px-6">
               {footer}
             </footer>
           ) : null}

@@ -1,18 +1,38 @@
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { useWorkforce } from "@/features/workforce/useWorkforce";
-import { usePeriodos, useSemanas, useColumnas } from "@/features/hours/hooks";
+import {
+  usePeriodos,
+  useSemanas,
+  useColumnas,
+  useProyectosSeleccionados,
+  useUpdateProyectosSeleccionados,
+  useExportarPeriodo,
+} from "@/features/hours/hooks";
 import { PeriodSelector } from "@/features/hours/components/PeriodSelector";
 import { WeekSection } from "@/features/hours/components/WeekSection";
+import { ProjectsModal } from "@/features/hours/components/ProjectsModal";
 
 export function HoursRegisterPage() {
+  const navigate = useNavigate();
   const { trabajador } = useWorkforce();
   const [periodoId, setPeriodoId] = useState<string>("");
+  const [projectsModalOpen, setProjectsModalOpen] = useState(false);
 
   const periodosQuery = usePeriodos();
   const semanasQuery = useSemanas(periodoId || undefined);
-  const columnasInfo = useColumnas();
+  const proyectosSeleccionadosQuery = useProyectosSeleccionados(trabajador?.id, periodoId || undefined);
+  const columnasInfo = useColumnas(proyectosSeleccionadosQuery.data);
+  const updateProyectosSeleccionados = useUpdateProyectosSeleccionados(trabajador?.id, periodoId || undefined);
+
+  const periodoActual = periodosQuery.data?.find((periodo) => periodo.id === periodoId);
+  const exportarPeriodo = useExportarPeriodo(
+    trabajador?.id,
+    periodoActual,
+    semanasQuery.data ?? [],
+    columnasInfo.columnas,
+  );
 
   useEffect(() => {
     if (!periodosQuery.data?.length) return;
@@ -29,11 +49,7 @@ export function HoursRegisterPage() {
       <nav aria-label="Ruta de navegación" className="mb-3">
         <ol className="flex items-center gap-2 text-sm text-ink-muted">
           <li>
-            <button
-              type="button"
-              onClick={() => toast("El módulo \"Inicio\" se construirá en la siguiente etapa.")}
-              className="hover:text-krontec-blue"
-            >
+            <button type="button" onClick={() => navigate("/inicio")} className="hover:text-krontec-blue">
               Inicio
             </button>
           </li>
@@ -53,7 +69,17 @@ export function HoursRegisterPage() {
         </p>
       </section>
 
-      <PeriodSelector periodoId={periodoId} onPeriodoChange={setPeriodoId} periodos={periodosQuery.data ?? []} />
+      <PeriodSelector
+        periodoId={periodoId}
+        onPeriodoChange={setPeriodoId}
+        periodos={periodosQuery.data ?? []}
+        onManageProjects={() => {
+          void columnasInfo.refetchProyectos();
+          setProjectsModalOpen(true);
+        }}
+        onExportPeriodo={() => exportarPeriodo.mutate()}
+        isExporting={exportarPeriodo.isPending}
+      />
 
       {!trabajador ? (
         <div className="rounded-xl border border-[#dfe5ee] bg-white p-10 text-center text-sm text-ink-muted shadow-[0_0.25rem_1rem_rgba(27,51,87,0.035)]">
@@ -68,6 +94,19 @@ export function HoursRegisterPage() {
           <WeekSection key={semana.id} trabajadorId={trabajador.id} semana={semana} columns={columnasInfo.columnas} />
         ))
       )}
+
+      <ProjectsModal
+        open={projectsModalOpen}
+        onOpenChange={setProjectsModalOpen}
+        proyectosDisponibles={columnasInfo.proyectosDisponibles}
+        proyectosSeleccionadosIds={proyectosSeleccionadosQuery.data ?? []}
+        isSaving={updateProyectosSeleccionados.isPending}
+        onSave={(proyectoIds) => {
+          updateProyectosSeleccionados.mutate(proyectoIds, {
+            onSuccess: () => setProjectsModalOpen(false),
+          });
+        }}
+      />
     </AppShell>
   );
 }

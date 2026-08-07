@@ -26,43 +26,45 @@ export function ApprovalsPage() {
         ) : !planillas.length ? (
           <div className="p-8 text-center text-sm text-ink-muted">No hay planillas pendientes de aprobación.</div>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Trabajador</th>
-                <th className="px-4 py-3 font-semibold">Semana</th>
-                <th className="px-4 py-3 font-semibold">Período</th>
-                <th className="px-4 py-3 text-right font-semibold">Ordinarias</th>
-                <th className="px-4 py-3 text-right font-semibold">Extra</th>
-                <th className="px-4 py-3 text-right font-semibold">Ausencias</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {planillas.map((planilla) => (
-                <tr key={planilla.id} className="border-t border-[#e5eaf1] hover:bg-[#f8fbff]">
-                  <td className="px-4 py-3 font-medium text-ink">{planilla.trabajadorNombre}</td>
-                  <td className="px-4 py-3 text-ink-muted">
-                    Semana {planilla.semanaNumero} · {formatDateCl(planilla.semanaFechaInicio)} –{" "}
-                    {formatDateCl(planilla.semanaFechaFin)}
-                  </td>
-                  <td className="px-4 py-3 text-ink-muted">{planilla.periodoNombre}</td>
-                  <td className="px-4 py-3 text-right">{formatHours(planilla.totalOrdinarias)}</td>
-                  <td className="px-4 py-3 text-right">{formatHours(planilla.totalExtraordinarias)}</td>
-                  <td className="px-4 py-3 text-right">{formatHours(planilla.totalAusencias)}</td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setSeleccionada(planilla)}
-                      className="btn-outline min-h-[36px] px-3 text-xs"
-                    >
-                      Revisar
-                    </button>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[880px] text-left text-sm">
+              <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
+                <tr>
+                  <th className="px-4 py-3 font-semibold">Trabajador</th>
+                  <th className="px-4 py-3 font-semibold">Semana</th>
+                  <th className="px-4 py-3 font-semibold">Período</th>
+                  <th className="px-4 py-3 text-right font-semibold">Ordinarias</th>
+                  <th className="px-4 py-3 text-right font-semibold">Extra</th>
+                  <th className="px-4 py-3 text-right font-semibold">Ausencias</th>
+                  <th className="px-4 py-3" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {planillas.map((planilla) => (
+                  <tr key={planilla.id} className="border-t border-[#e5eaf1] hover:bg-[#f8fbff]">
+                    <td className="px-4 py-3 font-medium text-ink">{planilla.trabajadorNombre}</td>
+                    <td className="px-4 py-3 text-ink-muted">
+                      Semana {planilla.semanaNumero} · {formatDateCl(planilla.semanaFechaInicio)} –{" "}
+                      {formatDateCl(planilla.semanaFechaFin)}
+                    </td>
+                    <td className="px-4 py-3 text-ink-muted">{planilla.periodoNombre}</td>
+                    <td className="px-4 py-3 text-right">{formatHours(planilla.totalOrdinarias)}</td>
+                    <td className="px-4 py-3 text-right">{formatHours(planilla.totalExtraordinarias)}</td>
+                    <td className="px-4 py-3 text-right">{formatHours(planilla.totalAusencias)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setSeleccionada(planilla)}
+                        className="btn-outline min-h-[36px] px-3 text-xs"
+                      >
+                        Revisar
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
