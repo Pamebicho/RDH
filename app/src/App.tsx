@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/pages/LoginPage";
+import { HomePage } from "@/pages/HomePage";
 import { HoursRegisterPage } from "@/pages/HoursRegisterPage";
 import { ApprovalsPage } from "@/pages/ApprovalsPage";
 import { ReportsPage } from "@/pages/ReportsPage";
@@ -17,6 +18,14 @@ export function App() {
           <GuestRoute>
             <LoginPage />
           </GuestRoute>
+        }
+      />
+      <Route
+        path="/inicio"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
         }
       />
       <Route

@@ -10,7 +10,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { label: "Inicio", icon: Home },
+  { label: "Inicio", icon: Home, href: "/inicio" },
   {
     label: "Registro de horas",
     icon: CalendarRange,
