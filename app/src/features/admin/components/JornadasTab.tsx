@@ -49,39 +49,41 @@ export function JornadasTab() {
       {diasQuery.isLoading ? (
         <div className="p-8 text-center text-sm text-ink-muted">Cargando…</div>
       ) : (
-        <table className="w-full text-left text-sm">
-          <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
-            <tr>
-              <th className="px-4 py-3 font-semibold">Día</th>
-              <th className="px-4 py-3 font-semibold">Horas esperadas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {DIAS.map((dia) => (
-              <tr key={dia.numero} className="border-t border-[#e5eaf1]">
-                <td className="px-4 py-3 font-medium text-ink">{dia.nombre}</td>
-                <td className="px-4 py-3">
-                  <input
-                    type="number"
-                    min={0}
-                    max={24}
-                    step={0.5}
-                    defaultValue={horasPorDia.get(dia.numero) ?? 0}
-                    onBlur={(event) => {
-                      if (!jornadaId) return;
-                      upsertDia.mutate({
-                        jornada_id: jornadaId,
-                        dia_semana: dia.numero,
-                        horas_esperadas: Number(event.target.value || 0),
-                      });
-                    }}
-                    className="form-input w-28"
-                  />
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[360px] text-left text-sm">
+            <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
+              <tr>
+                <th className="px-4 py-3 font-semibold">Día</th>
+                <th className="px-4 py-3 font-semibold">Horas esperadas</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {DIAS.map((dia) => (
+                <tr key={dia.numero} className="border-t border-[#e5eaf1]">
+                  <td className="px-4 py-3 font-medium text-ink">{dia.nombre}</td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="number"
+                      min={0}
+                      max={24}
+                      step={0.5}
+                      defaultValue={horasPorDia.get(dia.numero) ?? 0}
+                      onBlur={(event) => {
+                        if (!jornadaId) return;
+                        upsertDia.mutate({
+                          jornada_id: jornadaId,
+                          dia_semana: dia.numero,
+                          horas_esperadas: Number(event.target.value || 0),
+                        });
+                      }}
+                      className="form-input w-28"
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );

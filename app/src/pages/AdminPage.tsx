@@ -1,22 +1,14 @@
 import { useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { cn } from "@/utils/cn";
-import { AreasTab } from "@/features/admin/components/AreasTab";
-import { CargosTab } from "@/features/admin/components/CargosTab";
 import { ProyectosTab } from "@/features/admin/components/ProyectosTab";
 import { JornadasTab } from "@/features/admin/components/JornadasTab";
-import { FeriadosTab } from "@/features/admin/components/FeriadosTab";
-import { TiposRegistroTab } from "@/features/admin/components/TiposRegistroTab";
 import { PersonasTab } from "@/features/admin/components/PersonasTab";
 
 const TABS = [
   { id: "personas", label: "Personas y roles", Component: PersonasTab },
   { id: "proyectos", label: "Proyectos", Component: ProyectosTab },
-  { id: "areas", label: "Áreas", Component: AreasTab },
-  { id: "cargos", label: "Cargos", Component: CargosTab },
   { id: "jornadas", label: "Jornadas", Component: JornadasTab },
-  { id: "feriados", label: "Feriados", Component: FeriadosTab },
-  { id: "tipos-registro", label: "Tipos de registro", Component: TiposRegistroTab },
 ] as const;
 
 export function AdminPage() {

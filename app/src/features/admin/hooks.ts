@@ -119,6 +119,58 @@ export function useRolesCatalogo() {
   return useCatalog("roles-catalogo", api.fetchRoles);
 }
 
+export function useCrearTrabajador() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.crearTrabajador,
+    onSuccess: () => {
+      toast.success("Trabajador agregado.");
+      void queryClient.invalidateQueries({ queryKey: ["trabajadores-admin"] });
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error && error.message.includes("duplicate")
+          ? "Ya existe un trabajador con ese correo o RUT."
+          : "No fue posible agregar el trabajador.";
+      toast.error(message);
+    },
+  });
+}
+
+export function useActualizarTrabajador(trabajadorId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (datos: api.DatosTrabajador) => api.actualizarTrabajador(trabajadorId as string, datos),
+    onSuccess: () => {
+      toast.success("Datos del trabajador actualizados.");
+      void queryClient.invalidateQueries({ queryKey: ["trabajadores-admin"] });
+    },
+    onError: (error: unknown) => {
+      const message =
+        error instanceof Error && error.message.includes("duplicate")
+          ? "Ya existe otro trabajador con ese correo o RUT."
+          : "No fue posible actualizar los datos.";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSetTrabajadorActivo() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, activo }: { id: string; activo: boolean }) => api.setTrabajadorActivo(id, activo),
+    onSuccess: (_data, { activo }) => {
+      toast.success(activo ? "Trabajador reactivado." : "Trabajador eliminado (queda inactivo en el sistema).");
+      void queryClient.invalidateQueries({ queryKey: ["trabajadores-admin"] });
+    },
+    onError: () => toast.error("No fue posible cambiar el estado del trabajador."),
+  });
+}
+
+export function useTodosTrabajadorRoles() {
+  return useCatalog("trabajador-roles-todos", api.fetchTodosTrabajadorRoles);
+}
+
 export function useTrabajadorRoles(trabajadorId: string | null) {
   return useQuery({
     queryKey: ["trabajador-roles", trabajadorId],
@@ -134,6 +186,7 @@ export function useAsignarRol(trabajadorId: string | null) {
     onSuccess: () => {
       toast.success("Rol asignado.");
       void queryClient.invalidateQueries({ queryKey: ["trabajador-roles", trabajadorId] });
+      void queryClient.invalidateQueries({ queryKey: ["trabajador-roles-todos"] });
     },
     onError: () => toast.error("No fue posible asignar el rol."),
   });
@@ -146,6 +199,7 @@ export function useRevocarRol(trabajadorId: string | null) {
     onSuccess: () => {
       toast.success("Rol revocado.");
       void queryClient.invalidateQueries({ queryKey: ["trabajador-roles", trabajadorId] });
+      void queryClient.invalidateQueries({ queryKey: ["trabajador-roles-todos"] });
     },
     onError: () => toast.error("No fue posible revocar el rol."),
   });
