@@ -975,18 +975,111 @@ insert into public.feriados (fecha, nombre, tipo) values
   ('2026-12-25', 'Navidad', 'FIJO')
 on conflict (fecha) do update set nombre = excluded.nombre, tipo = excluded.tipo, activo = true;
 
--- Centros de costo fijos: los mismos para todos los trabajadores, en todos los períodos
--- (no hay selección por trabajador/período). Se desactivan los de ejemplo de la v1 que ya
--- no aplican, sin borrarlos (por si ya hay registros_horas/asignaciones que los referencian).
+-- Se desactivan los centros de costo de ejemplo de la v1 que no son reales (no aparecen en el
+-- catálogo real de la empresa), sin borrarlos por si ya hay registros_horas que los referencian.
 update public.proyectos set activo = false
-where codigo in ('10-010', '41-394', '41-451', '60-002', '30-101', '40-220', '50-033');
+where codigo in ('60-002', '30-101', '40-220', '50-033');
 
+-- El código 99-999 fue solo una prueba manual: se borra si no tiene horas/asignaciones
+-- registradas; si ya tiene datos asociados, se deja desactivado como respaldo.
+delete from public.proyectos p
+where p.codigo = '99-999'
+  and not exists (select 1 from public.registros_horas r where r.proyecto_id = p.id)
+  and not exists (select 1 from public.trabajador_proyectos_periodo t where t.proyecto_id = p.id);
+update public.proyectos set activo = false where codigo = '99-999';
+
+-- Catálogo real de centros de costo activos, tomado de Info/HH 07 2026 Ctrl Diario PCC.xlsx
+-- (hoja "Resumen"). Los 5 primeros son los fijos que siempre aparecen para todos los
+-- trabajadores (ver FIXED_COST_CENTER_CODES en app/src/features/hours/domain.ts); el resto
+-- queda disponible para seleccionar por período desde el botón "Centros de costo".
 insert into public.proyectos (codigo, nombre) values
-  ('20-004', 'Reuniones de Operaciones'),
-  ('20-009', 'Capacitaciones Técnicas'),
-  ('20-013', 'Gest. Operaciones'),
+  ('20-004', 'Reunión Operaciones'),
+  ('20-009', 'Capacitaciones Técnicas sin CC asignado'),
+  ('20-013', 'Visitas a Terreno (Gestión Operacional)'),
   ('20-015', 'Capacitaciones Seguridad'),
-  ('20-020', 'Gest. Ofertas Técnicas')
+  ('20-020', 'Gestión de ofertas Técnicas'),
+  ('20-011', 'Gestión área eficiencia Energética'),
+  ('20-012', 'Soporte Técnico AMDT'),
+  ('20-016', 'Capacitación técnica con CC asignado'),
+  ('20-017', 'Estudio de nuevas tecnologias/Innovación'),
+  ('20-019', 'Gestion comercial CIK'),
+  ('20-021', 'Gestión Gerente Operaciones'),
+  ('20-100', 'Centro integración Krontec'),
+  ('41-341', 'Mig. PLC CCCH'),
+  ('41-343', 'Proyecto PME DSAL'),
+  ('41-364', 'PTA DEM. DE LIXIVIACIÓN– DRT'),
+  ('41-382', 'Servicio Octoplant Codelco Corporativo'),
+  ('41-386', 'Gabinetes para Coasin'),
+  ('41-394', 'Proyecto Codelco TOVE IV'),
+  ('41-398', 'Chuqui Precisión IX Etapa Tranque Talabre'),
+  ('41-402', 'Enap, sala eléctrica Hualpen'),
+  ('41-417', 'Sistema de gestión hospitales, Dartel'),
+  ('41-419', 'Implementación Octoplant para Aceros, Descom'),
+  ('41-420', 'Servicios programación PLC SQM'),
+  ('41-425', 'Servicios Aceros Arequipa Octopant'),
+  ('41-428', 'Capacitación Puerto barquitos'),
+  ('41-429', 'Contrato de Apoyo QA a MEL'),
+  ('41-434', 'SQM Industrial - Vicepresidencia Operaciones Nitratos y Yodo, Faena Coya Sur'),
+  ('41-437', 'Upgrade sistema de gestión de energía Ion Enterprise e implementación PME 2023'),
+  ('41-441', 'Upgrade PME de MEL'),
+  ('41-445', 'Cto Mantención DRT'),
+  ('41-450', 'Mantenimiento y Asistencia PCS Planta Concentradora Mantoverde'),
+  ('41-451', 'Servicio de levantamiento Sonacol'),
+  ('41-452', 'Recomisionamiento Lógica Bomba GEHO 286 y Gateway'),
+  ('41-455', 'Asesoría y servicio e implementación de Ciberseguridad OYV'),
+  ('41-456', 'Contrato marco de tecnología y automatización'),
+  ('41-457', 'Migración CITEC Meridian'),
+  ('41-458', 'Cambio IP PMER Candelaria'),
+  ('42-001', 'Modelos Tarifas'),
+  ('42-003', 'Estudios de I+D'),
+  ('42-004', 'Apoyo Gerencia Innovación'),
+  ('42-005', 'Sist. análisis trafos'),
+  ('43-029', 'Administración contrato Marco'),
+  ('43-052', 'DPS Tech Components SCPY'),
+  ('43-058', 'EXE Retrofit PCS7 Molinos Concentradora Spence'),
+  ('43-062', 'EXE Upgrade PLC OLAP Apilamiento'),
+  ('43-063', 'EXE Migración PLC Bomba Geho 285 CHO'),
+  ('43-070', 'SPS/DPS Upgrade PLC MDC-RO-Filters Courier AH1'),
+  ('43-071', 'SPS/DPS Upgrade PLC OLAP - Ripios'),
+  ('43-073', 'Cerro Colorado Life Extension CCLE'),
+  ('43-074', 'IPS Upgrade DCS Laguna Seca L2'),
+  ('43-075', 'CS-Bailey DCS Migration Dry Area'),
+  ('43-076', 'Apoyo EXE SCPY Spence'),
+  ('46-001', 'CIK - Procesos Ambientales - BHP Spence'),
+  ('46-002', 'Suministro Sistema de Control y Comunicaciones MVO-031'),
+  ('46-003', 'Suministro gabinete Thechint sistema Voip (telefonía)'),
+  ('46-004', 'Capstone Copper'),
+  ('46-005', 'Suministro gabinete 2000-EXP-01 Minera Carola'),
+  ('10-001', 'Otros Gerencia General'),
+  ('10-003', 'Otros Contabilidad'),
+  ('10-010', 'Otros TI'),
+  ('20-014', 'Gestión Comercial MDT'),
+  ('41-418', 'Validación Buses de Campo Laguna Seca L2'),
+  ('41-423', 'Servicio Verificación integridad Buses de Campo FF Flotación Rougher'),
+  ('41-427', 'Configuración de programa bomba Geho en BMI'),
+  ('41-430', 'Capacitación y soporte AXS4 ICCP'),
+  ('41-433', 'Implementación Servidor Octoplant CCU - 3 Plantas'),
+  ('41-436', 'Migración Red Profibus a Profinet MolyB'),
+  ('41-438', 'Servicio de actualización y mantenimiento servidores Octoplant'),
+  ('41-446', 'Asistencia especialista PME Clínica Alemana'),
+  ('41-447', 'Recuperación PME Elecmetal'),
+  ('41-449', 'Migración ICCP Arauco'),
+  ('43-077', 'Centro de costo 43-077'),
+  ('30-002', 'Gastos Comerciales'),
+  ('30-005', 'Gestión comercial Zona Norte'),
+  ('30-007', 'Gestión comercial Zona Sur'),
+  ('30-010', 'Oficina Jardines'),
+  ('30-011', 'Viajes Internacionales'),
+  -- Códigos detectados en el histórico de horas de julio 2026 (Info/HH ...) que no
+  -- aparecían en el catálogo "Hoja1" del Excel.
+  ('10-009', 'Comité Paritario'),
+  ('10-012', 'Oficinas Jardines'),
+  ('41-448', 'Servicios en terreno MVO'),
+  ('12-002', 'Centro de costo 12-002'),
+  ('43-072', 'Centro de costo 43-072'),
+  ('61-595', 'Centro de costo 61-595'),
+  ('61-596', 'Centro de costo 61-596'),
+  ('61-600', 'Centro de costo 61-600')
 on conflict (codigo) do update set nombre = excluded.nombre, activo = true;
 
 -- Limpieza puntual: se quitan del selector los períodos ya generados de meses que dejaron de
