@@ -66,8 +66,8 @@ export function PersonasTab() {
           cargoNombre,
           rolesNombre,
         ]
-          .filter(Boolean)
-          .some((valor) => valor!.toLowerCase().includes(termino));
+          .filter((valor): valor is string => Boolean(valor))
+          .some((valor) => valor.toLowerCase().includes(termino));
       });
     }
 
