@@ -69,9 +69,10 @@ export function ProyectosTab() {
         <div className="p-8 text-center text-sm text-ink-muted">Cargando…</div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <table className="w-full min-w-[600px] text-left text-sm">
             <thead className="bg-[#fbfcfe] text-xs text-ink-muted">
               <tr>
+                <th className="px-4 py-3 font-semibold">N°</th>
                 <th className="px-4 py-3 font-semibold">Código</th>
                 <th className="px-4 py-3 font-semibold">Nombre</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
@@ -79,8 +80,9 @@ export function ProyectosTab() {
               </tr>
             </thead>
             <tbody>
-              {proyectosFiltrados.map((proyecto) => (
+              {proyectosFiltrados.map((proyecto, index) => (
                 <tr key={proyecto.id} className="border-t border-[#e5eaf1]">
+                  <td className="px-4 py-3 text-ink-muted">{index + 1}</td>
                   <td className="px-4 py-3 font-medium text-ink">{proyecto.codigo}</td>
                   <td className="px-4 py-3 text-ink-muted">{proyecto.nombre}</td>
                   <td className="px-4 py-3">{proyecto.activo ? "Activo" : "Inactivo"}</td>
@@ -104,7 +106,7 @@ export function ProyectosTab() {
               ))}
               {!proyectosFiltrados.length ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-ink-muted">
+                  <td colSpan={5} className="px-4 py-6 text-center text-ink-muted">
                     No se encontraron centros de costo para "{busqueda}".
                   </td>
                 </tr>

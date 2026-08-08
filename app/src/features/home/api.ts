@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import type { PlanillaSemanal, RegistroHoras } from "@/types/database.types";
 
 export async function fetchTrabajadoresActivosCount(): Promise<number> {
   const { count, error } = await supabase
@@ -29,4 +30,22 @@ export async function fetchPlanillasPendientesCount(): Promise<number> {
 
   if (error) throw error;
   return count ?? 0;
+}
+
+export async function fetchPlanillasDelPeriodo(periodoId: string): Promise<PlanillaSemanal[]> {
+  const { data, error } = await supabase.from("planillas_semanales").select("*").eq("periodo_id", periodoId);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchRegistrosPorPlanillas(planillaIds: string[]): Promise<RegistroHoras[]> {
+  if (!planillaIds.length) return [];
+  const { data, error } = await supabase
+    .from("registros_horas")
+    .select("*")
+    .in("planilla_semanal_id", planillaIds)
+    .eq("anulado", false);
+
+  if (error) throw error;
+  return data ?? [];
 }
