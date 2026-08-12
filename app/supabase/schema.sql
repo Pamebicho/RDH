@@ -1082,6 +1082,40 @@ insert into public.proyectos (codigo, nombre) values
   ('61-600', 'Centro de costo 61-600')
 on conflict (codigo) do update set nombre = excluded.nombre, activo = true;
 
+-- Categoría "Cliente/Área" por centro de costo, para el dashboard de HH. Se agrega como
+-- columna editable desde Configuración (no un catálogo aparte) para mantenerlo simple.
+-- El mapeo replica exactamente el agrupamiento manual que usa Info/HH 07 2026 Ctrl Diario
+-- PCC.xlsx (hoja Resumen, fórmulas SUMIF de la sección "Cliente"). Los códigos que esa hoja
+-- nunca agrupó (ni los que agregamos después al catálogo) quedan con cliente_area = null,
+-- mostrados en el dashboard como "Sin categoría" — no se fuerza un valor inventado.
+alter table public.proyectos add column if not exists cliente_area varchar(150);
+
+update public.proyectos set cliente_area = 'Codelco DRT' where codigo in ('41-445');
+update public.proyectos set cliente_area = 'Codelco, Contrato Marco' where codigo in ('41-456');
+update public.proyectos set cliente_area = 'BHP Technology' where codigo in (
+  '43-029', '43-052', '43-058', '43-062', '43-063', '43-070', '43-071', '43-073', '43-074', '43-075', '43-076'
+);
+update public.proyectos set cliente_area = 'BHP MEL y Spence' where codigo in ('41-429', '41-452');
+update public.proyectos set cliente_area = 'Mantoverde' where codigo in ('41-450');
+update public.proyectos set cliente_area = 'CDRT Pta demostrativa' where codigo in ('41-364');
+update public.proyectos set cliente_area = 'Coasin' where codigo in ('41-386');
+update public.proyectos set cliente_area = 'Proyecto Talabre' where codigo in ('41-398');
+update public.proyectos set cliente_area = 'Proyecto Tove 4' where codigo in ('41-394');
+update public.proyectos set cliente_area = 'Proyecto Enap Hualpen' where codigo in ('41-402');
+update public.proyectos set cliente_area = 'Gestión de Energía' where codigo in (
+  '20-011', '41-343', '41-417', '41-437', '41-441', '42-001', '42-004', '41-458'
+);
+update public.proyectos set cliente_area = 'CIK' where codigo in ('20-019', '46-001', '46-002', '46-004', '46-005');
+update public.proyectos set cliente_area = 'Operaciones' where codigo in ('20-004', '20-013', '20-021');
+update public.proyectos set cliente_area = 'Capacitaciones' where codigo in ('20-009', '20-015', '20-016', '20-017');
+update public.proyectos set cliente_area = 'SQM' where codigo in ('41-420', '41-434');
+update public.proyectos set cliente_area = 'Apoyo otras gerencias' where codigo in (
+  '20-020', '10-001', '10-003', '30-005', '30-007', '30-010', '30-011'
+);
+update public.proyectos set cliente_area = 'AMDT' where codigo in ('20-012', '41-382', '41-419', '41-425');
+update public.proyectos set cliente_area = 'IT' where codigo in ('10-010', '41-455');
+update public.proyectos set cliente_area = 'Sonacol' where codigo in ('41-451');
+
 -- Limpieza puntual: se quitan del selector los períodos ya generados de meses que dejaron de
 -- interesar (mayo/junio/julio 2026), siempre que no tengan una planilla cargada (si alguien ya
 -- registró horas ahí, se conserva para no perder datos).

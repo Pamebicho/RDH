@@ -97,6 +97,7 @@ export async function upsertProyecto(proyecto: {
   codigo: string;
   nombre: string;
   descripcion?: string | null;
+  cliente_area?: string | null;
   activo: boolean;
 }): Promise<void> {
   const { error } = await supabase.from("proyectos").upsert(proyecto);

@@ -12,29 +12,23 @@ import {
   fetchTrabajadoresActivosCount,
 } from "./api";
 
-const ESTADOS_PLANILLA = ["BORRADOR", "ENVIADA", "DEVUELTA", "APROBADA", "REABIERTA", "BLOQUEADA"] as const;
+const SIN_CATEGORIA = "Sin categoría";
+const VACACIONES_LICENCIA = "Vacaciones / Licencia";
 
-const ESTADO_LABEL: Record<(typeof ESTADOS_PLANILLA)[number], string> = {
-  BORRADOR: "Borrador",
-  ENVIADA: "Enviada",
-  DEVUELTA: "Devuelta",
-  APROBADA: "Aprobada",
-  REABIERTA: "Reabierta",
-  BLOQUEADA: "Bloqueada",
-};
+export interface ClienteAreaHoras {
+  clienteArea: string;
+  horas: number;
+}
 
-export interface HorasPorProyecto {
+export interface CentroCostoHoras {
   codigo: string;
   nombre: string;
   horas: number;
 }
 
-export interface PlanillasPorEstado {
-  estado: string;
-  cantidad: number;
+export interface ParetoPunto extends ClienteAreaHoras {
+  porcentajeAcumulado: number;
 }
-
-const MAX_PROYECTOS_GRAFICO = 8;
 
 export function useResumenPeriodo(periodoId: string | undefined) {
   const planillasQuery = useQuery({
@@ -52,42 +46,60 @@ export function useResumenPeriodo(periodoId: string | undefined) {
 
   const isLoading = planillasQuery.isLoading || registrosQuery.isLoading || proyectosQuery.isLoading;
 
-  const planillasPorEstado: PlanillasPorEstado[] = ESTADOS_PLANILLA.map((estado) => ({
-    estado: ESTADO_LABEL[estado],
-    cantidad: (planillasQuery.data ?? []).filter((planilla) => planilla.estado === estado).length,
-  })).filter((item) => item.cantidad > 0);
-
-  const nombrePorProyectoId = new Map((proyectosQuery.data ?? []).map((p) => [p.id, p]));
+  const proyectoPorId = new Map((proyectosQuery.data ?? []).map((p) => [p.id, p]));
   const horasPorProyectoId = new Map<string, number>();
   for (const registro of registrosQuery.data ?? []) {
     if (!registro.proyecto_id) continue;
     horasPorProyectoId.set(registro.proyecto_id, (horasPorProyectoId.get(registro.proyecto_id) ?? 0) + Number(registro.horas));
   }
 
-  const horasOrdenadas = [...horasPorProyectoId.entries()]
-    .map(([proyectoId, horas]) => {
-      const proyecto = nombrePorProyectoId.get(proyectoId);
-      return { codigo: proyecto?.codigo ?? "—", nombre: proyecto?.nombre ?? "Desconocido", horas };
-    })
+  const proyectosActivos = (proyectosQuery.data ?? []).filter((p) => p.activo);
+
+  const centrosCostoDetalle: CentroCostoHoras[] = proyectosActivos
+    .map((p) => ({ codigo: p.codigo, nombre: p.nombre, horas: horasPorProyectoId.get(p.id) ?? 0 }))
     .sort((a, b) => b.horas - a.horas);
 
-  const horasPorProyecto: HorasPorProyecto[] = horasOrdenadas.slice(0, MAX_PROYECTOS_GRAFICO);
-  const otrasHoras = horasOrdenadas.slice(MAX_PROYECTOS_GRAFICO).reduce((acc, item) => acc + item.horas, 0);
-  if (otrasHoras > 0) {
-    horasPorProyecto.push({ codigo: "OTROS", nombre: "Otros centros de costo", horas: otrasHoras });
+  const ccUtilizados = centrosCostoDetalle.filter((c) => c.horas > 0).length;
+  const ccSinMovimiento = centrosCostoDetalle.length - ccUtilizados;
+
+  const horasPorClienteArea = new Map<string, number>();
+  for (const [proyectoId, horas] of horasPorProyectoId) {
+    const clienteArea = proyectoPorId.get(proyectoId)?.cliente_area || SIN_CATEGORIA;
+    horasPorClienteArea.set(clienteArea, (horasPorClienteArea.get(clienteArea) ?? 0) + horas);
   }
+
+  // Horas sin centro de costo (vacaciones, licencia, etc.) — equivalente a la fila
+  // "No disponibles" de la hoja Resumen del Excel, para que el total de esta distribución
+  // sume el 100% de las horas del período, igual que "Horas registradas".
+  const horasSinCentroCosto = (registrosQuery.data ?? [])
+    .filter((r) => !r.proyecto_id)
+    .reduce((acc, r) => acc + Number(r.horas), 0);
+  if (horasSinCentroCosto > 0) {
+    horasPorClienteArea.set(VACACIONES_LICENCIA, horasSinCentroCosto);
+  }
+
+  const clienteAreaDetalle: ClienteAreaHoras[] = [...horasPorClienteArea.entries()]
+    .map(([clienteArea, horas]) => ({ clienteArea, horas }))
+    .sort((a, b) => b.horas - a.horas);
 
   const totalHoras = (registrosQuery.data ?? []).reduce((acc, r) => acc + Number(r.horas), 0);
   const trabajadoresConHoras = new Set((registrosQuery.data ?? []).map((r) => r.trabajador_id)).size;
-  const planillasTotal = planillasQuery.data?.length ?? 0;
+
+  let acumulado = 0;
+  const paretoData: ParetoPunto[] = clienteAreaDetalle.map((item) => {
+    acumulado += item.horas;
+    return { ...item, porcentajeAcumulado: totalHoras > 0 ? (acumulado / totalHoras) * 100 : 0 };
+  });
 
   return {
-    horasPorProyecto,
-    planillasPorEstado,
     isLoading,
     totalHoras,
     trabajadoresConHoras,
-    planillasTotal,
+    ccUtilizados,
+    ccSinMovimiento,
+    clienteAreaDetalle,
+    centrosCostoDetalle,
+    paretoData,
   };
 }
 
@@ -121,12 +133,23 @@ export function useExportarResumenPeriodo() {
             fecha: r.fecha,
             codigo: p?.codigo ?? "",
             nombreProyecto: p?.nombre ?? "",
+            clienteArea: p?.cliente_area ?? "",
             horas: Number(r.horas),
           };
         })
         .sort((a, b) => a.trabajador.localeCompare(b.trabajador, "es") || a.fecha.localeCompare(b.fecha));
 
-      const header = ["Trabajador", "RUT", "Área", "Cargo", "Fecha", "Centro de costo", "Nombre centro de costo", "Horas"];
+      const header = [
+        "Trabajador",
+        "RUT",
+        "Área",
+        "Cargo",
+        "Fecha",
+        "Centro de costo",
+        "Nombre centro de costo",
+        "Cliente/Área",
+        "Horas",
+      ];
       const rows = filas.map((f) => [
         f.trabajador,
         f.rut,
@@ -135,6 +158,7 @@ export function useExportarResumenPeriodo() {
         f.fecha,
         f.codigo,
         f.nombreProyecto,
+        f.clienteArea,
         f.horas.toString().replace(".", ","),
       ]);
 

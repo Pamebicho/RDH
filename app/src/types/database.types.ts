@@ -123,6 +123,7 @@ export interface Database {
           codigo: string;
           nombre: string;
           descripcion: string | null;
+          cliente_area: string | null;
           fecha_inicio: string | null;
           fecha_fin: string | null;
           activo: boolean;
@@ -136,6 +137,7 @@ export interface Database {
           codigo: string;
           nombre: string;
           descripcion?: string | null;
+          cliente_area?: string | null;
           fecha_inicio?: string | null;
           fecha_fin?: string | null;
           activo?: boolean;
