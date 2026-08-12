@@ -3017,3 +3017,135 @@ join public.planillas_semanales pl on pl.trabajador_id = t.id and pl.semana_id =
 
 drop table _import_cc_pedro;
 drop table _import_ausencias;
+
+-- =============================================================================
+-- Complemento: Patricio Maldonado — otro trabajador que, igual que Pedro Cueto,
+-- quedó fuera del import original de TI/Operaciones/CIK (157.5h totales, incluidas
+-- 17h de Vacaciones, que faltaban en el consolidado). Fuente: Info/HH 07 2026 Ctrl
+-- Diario PCC.xlsx, hoja "P. Maldonado" y hoja Remuneraciones (nombre + RUT).
+-- No se conocen su área, cargo ni fecha de ingreso (esos datos venían de
+-- "trabajadores krontec.xlsx", que no incluía a esta persona) — se dejan en null
+-- en vez de inventarlos.
+-- =============================================================================
+
+insert into public.trabajadores (rut, nombres, apellidos, correo_corporativo, activo)
+select '9.281.063-1', 'Patricio', 'Maldonado', 'patricio.maldonado@krontec.cl', true
+where not exists (select 1 from public.trabajadores ex where ex.rut = '9.281.063-1')
+  and not exists (select 1 from public.trabajadores ex2 where ex2.correo_corporativo = 'patricio.maldonado@krontec.cl');
+
+insert into public.trabajador_roles (trabajador_id, rol_id, activo)
+select t.id, r.id, true
+from public.trabajadores t join public.roles r on r.codigo = 'TRABAJADOR'
+where t.rut = '9.281.063-1'
+on conflict (trabajador_id, rol_id) do nothing;
+
+-- --- Horas por centro de costo de Patricio Maldonado ---
+create temporary table _import_cc_patricio (rut varchar(12), fecha date, codigo varchar(20), horas numeric(4,1));
+insert into _import_cc_patricio (rut, fecha, codigo, horas) values
+  ('9.281.063-1', '2026-06-25', '20-013', 4.5),
+  ('9.281.063-1', '2026-06-25', '41-429', 4),
+  ('9.281.063-1', '2026-06-26', '20-013', 2),
+  ('9.281.063-1', '2026-06-26', '41-429', 4),
+  ('9.281.063-1', '2026-07-02', '20-013', 3.5),
+  ('9.281.063-1', '2026-07-02', '20-015', 1),
+  ('9.281.063-1', '2026-07-02', '41-429', 4),
+  ('9.281.063-1', '2026-07-03', '20-013', 1),
+  ('9.281.063-1', '2026-07-03', '20-015', 1),
+  ('9.281.063-1', '2026-07-03', '41-429', 4),
+  ('9.281.063-1', '2026-07-06', '20-013', 4.5),
+  ('9.281.063-1', '2026-07-06', '41-429', 4),
+  ('9.281.063-1', '2026-07-07', '20-004', 2),
+  ('9.281.063-1', '2026-07-07', '20-013', 2.5),
+  ('9.281.063-1', '2026-07-07', '41-429', 4),
+  ('9.281.063-1', '2026-07-08', '20-013', 4.5),
+  ('9.281.063-1', '2026-07-08', '41-429', 4),
+  ('9.281.063-1', '2026-07-09', '20-013', 3.5),
+  ('9.281.063-1', '2026-07-09', '20-015', 1),
+  ('9.281.063-1', '2026-07-09', '41-429', 4),
+  ('9.281.063-1', '2026-07-10', '20-013', 2),
+  ('9.281.063-1', '2026-07-10', '41-429', 4),
+  ('9.281.063-1', '2026-07-13', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-13', '41-429', 8),
+  ('9.281.063-1', '2026-07-14', '20-004', 2),
+  ('9.281.063-1', '2026-07-14', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-14', '41-429', 6),
+  ('9.281.063-1', '2026-07-15', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-15', '41-429', 8),
+  ('9.281.063-1', '2026-07-17', '20-013', 1),
+  ('9.281.063-1', '2026-07-17', '41-429', 5),
+  ('9.281.063-1', '2026-07-20', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-20', '41-429', 8),
+  ('9.281.063-1', '2026-07-21', '20-004', 2),
+  ('9.281.063-1', '2026-07-21', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-21', '41-429', 6),
+  ('9.281.063-1', '2026-07-22', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-22', '41-429', 8),
+  ('9.281.063-1', '2026-07-23', '20-013', 0.5),
+  ('9.281.063-1', '2026-07-23', '41-429', 8),
+  ('9.281.063-1', '2026-07-24', '20-013', 1),
+  ('9.281.063-1', '2026-07-24', '41-429', 5);
+
+-- --- Vacaciones de Patricio Maldonado (17h, columna "Vacaciones" de su hoja) ---
+create temporary table _import_ausencias_patricio (rut varchar(12), fecha date, tipo varchar(10), horas numeric(4,1));
+insert into _import_ausencias_patricio (rut, fecha, tipo, horas) values
+  ('9.281.063-1', '2026-06-30', 'VAC', 8.5),
+  ('9.281.063-1', '2026-07-01', 'VAC', 8.5);
+
+-- --- Planillas semanales de Patricio Maldonado ---
+insert into public.planillas_semanales
+  (trabajador_id, semana_id, periodo_id, estado, total_ordinarias, enviada_en, aprobada_en)
+select t.id, s.id, s.periodo_id, 'APROBADA', sum(i.horas), now(), now()
+from _import_cc_patricio i
+join public.trabajadores t on t.rut = i.rut
+join public.semanas s on i.fecha between s.fecha_inicio and s.fecha_fin
+join public.periodos p on p.id = s.periodo_id and p.fecha_inicio = '2026-06-25' and p.fecha_fin = '2026-07-24'
+group by t.id, s.id, s.periodo_id
+on conflict (trabajador_id, semana_id, periodo_id) do update set
+  total_ordinarias = excluded.total_ordinarias,
+  estado = excluded.estado,
+  aprobada_en = excluded.aprobada_en;
+
+insert into public.planillas_semanales
+  (trabajador_id, semana_id, periodo_id, estado, total_ausencias, enviada_en, aprobada_en)
+select t.id, s.id, s.periodo_id, 'APROBADA', sum(i.horas), now(), now()
+from _import_ausencias_patricio i
+join public.trabajadores t on t.rut = i.rut
+join public.semanas s on i.fecha between s.fecha_inicio and s.fecha_fin
+join public.periodos p on p.id = s.periodo_id and p.fecha_inicio = '2026-06-25' and p.fecha_fin = '2026-07-24'
+group by t.id, s.id, s.periodo_id
+on conflict (trabajador_id, semana_id, periodo_id) do update set
+  total_ausencias = excluded.total_ausencias,
+  estado = excluded.estado,
+  aprobada_en = excluded.aprobada_en;
+
+-- --- Registros de horas ordinarias de Patricio Maldonado ---
+insert into public.registros_horas
+  (planilla_semanal_id, trabajador_id, fecha, proyecto_id, tipo_registro_id, horas)
+select pl.id, t.id, i.fecha, pr.id, tr.id, i.horas
+from _import_cc_patricio i
+join public.trabajadores t on t.rut = i.rut
+join public.proyectos pr on pr.codigo = i.codigo
+join public.semanas s on i.fecha between s.fecha_inicio and s.fecha_fin
+join public.periodos p on p.id = s.periodo_id and p.fecha_inicio = '2026-06-25' and p.fecha_fin = '2026-07-24'
+join public.planillas_semanales pl on pl.trabajador_id = t.id and pl.semana_id = s.id and pl.periodo_id = p.id
+cross join (select id from public.tipos_registro where codigo = 'ORD') tr
+on conflict (trabajador_id, fecha, tipo_registro_id, proyecto_id) do update set horas = excluded.horas;
+
+-- --- Registros de horas de ausencias (Vacaciones) de Patricio Maldonado ---
+delete from public.registros_horas rh
+using public.trabajadores t, public.tipos_registro tr, _import_ausencias_patricio i
+where rh.trabajador_id = t.id and rh.tipo_registro_id = tr.id and rh.proyecto_id is null
+  and t.rut = i.rut and rh.fecha = i.fecha and tr.codigo = i.tipo;
+
+insert into public.registros_horas
+  (planilla_semanal_id, trabajador_id, fecha, proyecto_id, tipo_registro_id, horas)
+select pl.id, t.id, i.fecha, null, tr.id, i.horas
+from _import_ausencias_patricio i
+join public.trabajadores t on t.rut = i.rut
+join public.tipos_registro tr on tr.codigo = i.tipo
+join public.semanas s on i.fecha between s.fecha_inicio and s.fecha_fin
+join public.periodos p on p.id = s.periodo_id and p.fecha_inicio = '2026-06-25' and p.fecha_fin = '2026-07-24'
+join public.planillas_semanales pl on pl.trabajador_id = t.id and pl.semana_id = s.id and pl.periodo_id = p.id;
+
+drop table _import_cc_patricio;
+drop table _import_ausencias_patricio;
