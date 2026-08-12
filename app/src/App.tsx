@@ -5,6 +5,7 @@ import { HoursRegisterPage } from "@/pages/HoursRegisterPage";
 import { ApprovalsPage } from "@/pages/ApprovalsPage";
 import { ReportsPage } from "@/pages/ReportsPage";
 import { AdminPage } from "@/pages/AdminPage";
+import { RrhhDistribucionPage } from "@/pages/RrhhDistribucionPage";
 import { ProtectedRoute, GuestRoute } from "@/routes/ProtectedRoute";
 import { RoleRoute } from "@/routes/RoleRoute";
 
@@ -64,6 +65,16 @@ export function App() {
           <ProtectedRoute>
             <RoleRoute roles={["SUPER_ADMIN"]}>
               <AdminPage />
+            </RoleRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rrhh-distribucion-cc"
+        element={
+          <ProtectedRoute>
+            <RoleRoute roles={["SUPER_ADMIN"]}>
+              <RrhhDistribucionPage />
             </RoleRoute>
           </ProtectedRoute>
         }

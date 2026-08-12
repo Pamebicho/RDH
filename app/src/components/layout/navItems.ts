@@ -1,4 +1,4 @@
-import { BarChart3, CalendarRange, CheckCircle2, Home, Settings, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarRange, CheckCircle2, Home, Settings, Users, type LucideIcon } from "lucide-react";
 import type { RolCodigo } from "@/types/database.types";
 
 export interface NavItem {
@@ -28,6 +28,12 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     href: "/reportes",
     roles: ["LECTOR", "SUPER_ADMIN"],
+  },
+  {
+    label: "RRHH",
+    icon: Users,
+    href: "/rrhh-distribucion-cc",
+    roles: ["SUPER_ADMIN"],
   },
   {
     label: "Configuración",
