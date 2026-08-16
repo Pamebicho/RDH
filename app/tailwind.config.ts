@@ -39,6 +39,7 @@ export default {
       },
       fontFamily: {
         sans: [
+          "Open Sans",
           "Segoe UI",
           "system-ui",
           "-apple-system",

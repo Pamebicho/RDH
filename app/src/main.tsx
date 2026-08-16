@@ -7,6 +7,16 @@ import { queryClient } from "@/lib/queryClient";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import { WorkforceProvider } from "@/features/workforce/WorkforceProvider";
 import { App } from "./App";
+import "@fontsource/open-sans/latin-400.css";
+import "@fontsource/open-sans/latin-500.css";
+import "@fontsource/open-sans/latin-600.css";
+import "@fontsource/open-sans/latin-700.css";
+import "@fontsource/open-sans/latin-800.css";
+import "@fontsource/open-sans/latin-ext-400.css";
+import "@fontsource/open-sans/latin-ext-500.css";
+import "@fontsource/open-sans/latin-ext-600.css";
+import "@fontsource/open-sans/latin-ext-700.css";
+import "@fontsource/open-sans/latin-ext-800.css";
 import "@/styles/index.css";
 
 createRoot(document.getElementById("root")!).render(
