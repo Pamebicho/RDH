@@ -63,6 +63,7 @@ export function JornadasTab() {
                   <td className="px-4 py-3 font-medium text-ink">{dia.nombre}</td>
                   <td className="px-4 py-3">
                     <input
+                      key={`${jornadaId}-${dia.numero}`}
                       type="number"
                       min={0}
                       max={24}

@@ -85,7 +85,7 @@ export function PersonasTab() {
 
     return lista;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [trabajadoresQuery.data, busqueda, orden, cargosQuery.data]);
+  }, [trabajadoresQuery.data, busqueda, orden, cargosQuery.data, trabajadorRolesQuery.data, rolesQuery.data]);
 
   function abrirNuevo() {
     setTrabajadorAEditar(null);

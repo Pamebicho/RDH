@@ -10,32 +10,8 @@ export function useAreas() {
   return useCatalog("areas", api.fetchAreas);
 }
 
-export function useUpsertArea() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: api.upsertArea,
-    onSuccess: () => {
-      toast.success("Área guardada.");
-      void queryClient.invalidateQueries({ queryKey: ["areas"] });
-    },
-    onError: () => toast.error("No fue posible guardar el área."),
-  });
-}
-
 export function useCargos() {
   return useCatalog("cargos", api.fetchCargos);
-}
-
-export function useUpsertCargo() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: api.upsertCargo,
-    onSuccess: () => {
-      toast.success("Cargo guardado.");
-      void queryClient.invalidateQueries({ queryKey: ["cargos"] });
-    },
-    onError: () => toast.error("No fue posible guardar el cargo."),
-  });
 }
 
 export function useAdminProyectos() {
@@ -52,39 +28,6 @@ export function useUpsertProyecto() {
       void queryClient.invalidateQueries({ queryKey: ["proyectos-activos"] });
     },
     onError: () => toast.error("No fue posible guardar el proyecto."),
-  });
-}
-
-export function useFeriados() {
-  return useCatalog("feriados-admin", api.fetchFeriados);
-}
-
-export function useUpsertFeriado() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: api.upsertFeriado,
-    onSuccess: () => {
-      toast.success("Feriado guardado.");
-      void queryClient.invalidateQueries({ queryKey: ["feriados-admin"] });
-    },
-    onError: () => toast.error("No fue posible guardar el feriado."),
-  });
-}
-
-export function useTiposRegistroAdmin() {
-  return useCatalog("tipos-registro-admin", api.fetchTiposRegistro);
-}
-
-export function useUpsertTipoRegistro() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: api.upsertTipoRegistro,
-    onSuccess: () => {
-      toast.success("Tipo de registro guardado.");
-      void queryClient.invalidateQueries({ queryKey: ["tipos-registro-admin"] });
-      void queryClient.invalidateQueries({ queryKey: ["tipos-registro-activos"] });
-    },
-    onError: () => toast.error("No fue posible guardar el tipo de registro."),
   });
 }
 
@@ -202,37 +145,5 @@ export function useRevocarRol(trabajadorId: string | null) {
       void queryClient.invalidateQueries({ queryKey: ["trabajador-roles-todos"] });
     },
     onError: () => toast.error("No fue posible revocar el rol."),
-  });
-}
-
-export function useAsignacionesDeProyecto(proyectoId: string | null) {
-  return useQuery({
-    queryKey: ["asignaciones-proyecto", proyectoId],
-    queryFn: () => api.fetchAsignacionesDeProyecto(proyectoId as string),
-    enabled: Boolean(proyectoId),
-  });
-}
-
-export function useAsignarAdministrador(proyectoId: string | null) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (administradorId: string) => api.asignarAdministrador(proyectoId as string, administradorId),
-    onSuccess: () => {
-      toast.success("Administrador asignado al proyecto.");
-      void queryClient.invalidateQueries({ queryKey: ["asignaciones-proyecto", proyectoId] });
-    },
-    onError: () => toast.error("No fue posible asignar el administrador."),
-  });
-}
-
-export function useRevocarAsignacion(proyectoId: string | null) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (asignacionId: string) => api.revocarAsignacion(asignacionId),
-    onSuccess: () => {
-      toast.success("Asignación revocada.");
-      void queryClient.invalidateQueries({ queryKey: ["asignaciones-proyecto", proyectoId] });
-    },
-    onError: () => toast.error("No fue posible revocar la asignación."),
   });
 }

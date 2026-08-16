@@ -7,7 +7,7 @@ export function formatDateCl(isoDate: string): string {
 }
 
 /** Convierte una fecha ISO 'YYYY-MM-DD' a Date en hora local (evita el corrimiento de zona horaria de `new Date(iso)`). */
-export function parseIsoDate(iso: string): Date {
+function parseIsoDate(iso: string): Date {
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(year, month - 1, day);
 }

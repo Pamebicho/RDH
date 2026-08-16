@@ -183,7 +183,7 @@ export function ProyectosTab() {
                 <th className="px-4 py-3 font-semibold">Nombre</th>
                 <th className="px-4 py-3 font-semibold">Cliente/Área</th>
                 <th className="px-4 py-3 font-semibold">Estado</th>
-                <th className="px-4 py-3 font-semibold">Acciones</th>
+                <th className="w-[160px] px-4 py-3 text-right font-semibold">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -194,13 +194,13 @@ export function ProyectosTab() {
                   <td className="px-4 py-3 text-ink-muted">{proyecto.nombre}</td>
                   <td className="px-4 py-3 text-ink-muted">{proyecto.cliente_area || "Sin categoría"}</td>
                   <td className="px-4 py-3">{proyecto.activo ? "Activo" : "Inactivo"}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
+                  <td className="w-[160px] px-4 py-3 text-right">
+                    <div className="flex shrink-0 justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => handleAbrirEditar(proyecto)}
                         aria-label={`Editar ${proyecto.codigo}`}
-                        className="btn-outline min-h-[32px] w-[32px] justify-center px-0"
+                        className="btn-outline min-h-[32px] w-[32px] shrink-0 justify-center px-0"
                       >
                         <Pencil className="h-3.5 w-3.5" aria-hidden />
                       </button>
@@ -214,7 +214,7 @@ export function ProyectosTab() {
                             activo: !proyecto.activo,
                           })
                         }
-                        className="btn-outline min-h-[32px] px-3 text-xs"
+                        className="btn-outline min-h-[32px] w-[92px] shrink-0 justify-center px-3 text-xs"
                       >
                         {proyecto.activo ? "Desactivar" : "Activar"}
                       </button>

@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminProyectos } from "@/features/admin/hooks";
 import { fetchAreas, fetchCargos, fetchProyectos, fetchTrabajadores } from "@/features/admin/api";
-import { rowsToCsv } from "@/features/hours/domain";
+import { descargarCsv, rowsToCsv } from "@/features/hours/domain";
 import type { Periodo } from "@/types/database.types";
 import {
   fetchCentrosCostoActivosCount,
@@ -163,15 +163,7 @@ export function useExportarResumenPeriodo() {
       ]);
 
       const csv = rowsToCsv([header, ...rows]);
-      const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `detalle-horas-${periodo.nombre.replaceAll(" ", "-").toLowerCase()}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      descargarCsv(csv, `detalle-horas-${periodo.nombre.replaceAll(" ", "-").toLowerCase()}.csv`);
     },
     onSuccess: () => {
       toast.success("Se descargó el detalle del período en un archivo CSV compatible con Microsoft Excel.");

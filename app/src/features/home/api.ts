@@ -21,15 +21,19 @@ export async function fetchCentrosCostoActivosCount(): Promise<number> {
   return count ?? 0;
 }
 
-/** RLS ya limita esto a SUPER_ADMIN (ve todas) o ADMINISTRADOR (solo las de sus proyectos). */
+/**
+ * Cuenta períodos pendientes de aprobación (no filas de planillas_semanales): un trabajador con
+ * varias semanas ENVIADA en el mismo período cuenta una sola vez, igual que en Aprobaciones.
+ * RLS ya limita esto a SUPER_ADMIN (ve todas) o ADMINISTRADOR (solo las de sus proyectos).
+ */
 export async function fetchPlanillasPendientesCount(): Promise<number> {
-  const { count, error } = await supabase
+  const { data, error } = await supabase
     .from("planillas_semanales")
-    .select("*", { count: "exact", head: true })
+    .select("trabajador_id, periodo_id")
     .eq("estado", "ENVIADA");
 
   if (error) throw error;
-  return count ?? 0;
+  return new Set((data ?? []).map((row) => `${row.trabajador_id}|${row.periodo_id}`)).size;
 }
 
 export async function fetchPlanillasDelPeriodo(periodoId: string): Promise<PlanillaSemanal[]> {

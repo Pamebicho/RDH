@@ -199,6 +199,19 @@ export function rowsToCsv(rows: string[][]): string {
   return rows.map((row) => row.map((cell) => `"${cell.replaceAll('"', '""')}"`).join(";")).join("\r\n");
 }
 
+/** Descarga un CSV en el navegador (con BOM para que Excel lo abra con el charset correcto). */
+export function descargarCsv(csv: string, nombreArchivo: string): void {
+  const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = nombreArchivo;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export interface SemanaConDias {
   numeroSemana: number;
   days: DayInfo[];

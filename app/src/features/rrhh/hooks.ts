@@ -1,13 +1,13 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminProyectos } from "@/features/admin/hooks";
-import { rowsToCsv } from "@/features/hours/domain";
+import { descargarCsv, rowsToCsv } from "@/features/hours/domain";
 import type { Periodo, RegistroHoras } from "@/types/database.types";
 import { fetchPlanillasDelPeriodo, fetchRegistrosPorPlanillas, fetchTrabajadores } from "./api";
 
 export type EstadoDistribucion = "CORRECTO" | "REVISAR" | "INCONSISTENCIA";
 
-export interface CentroCostoDistribucion {
+interface CentroCostoDistribucion {
   codigo: string;
   nombre: string;
   horas: number;
@@ -158,15 +158,7 @@ export function useExportarDistribucionCC() {
 
       const header = ["Número de Documento Colaborador", "Código de Ficha Colaborador", "Centro de Costo*", "Peso*"];
       const csv = rowsToCsv([header, ...filas]);
-      const blob = new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `distribucion-cc-${periodo.nombre.replaceAll(" ", "-").toLowerCase()}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      descargarCsv(csv, `distribucion-cc-${periodo.nombre.replaceAll(" ", "-").toLowerCase()}.csv`);
     },
     onSuccess: () => {
       toast.success("Se descargó la distribución de Centros de Costo en un archivo CSV.");
