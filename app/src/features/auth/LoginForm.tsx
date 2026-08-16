@@ -88,21 +88,21 @@ export function LoginForm() {
   };
 
   return (
-    <article className="w-full max-w-[40rem] rounded-card border border-krontec-gray/60 bg-white/97 p-6 shadow-card sm:p-10 lg:p-12">
-      <header className="mb-8 text-center">
-        <div className="mx-auto mb-4 grid h-[4.5rem] w-[4.5rem] place-items-center rounded-full bg-gradient-to-br from-krontec-sky/20 to-krontec-violet/15 text-krontec-blue">
-          <Clock className="h-9 w-9" aria-hidden />
+    <article className="w-full max-w-md rounded-card border border-krontec-gray/60 bg-white/97 p-5 shadow-card sm:p-7">
+      <header className="mb-5 text-center">
+        <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-krontec-sky/20 to-krontec-violet/15 text-krontec-blue">
+          <Clock className="h-6 w-6" aria-hidden />
         </div>
-        <h2 className="mb-2 text-3xl font-extrabold tracking-tight text-ink sm:text-4xl">
+        <h2 className="mb-1.5 text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
           Bienvenido
         </h2>
-        <p className="mx-auto max-w-[24.5rem] text-base leading-relaxed text-ink-muted">
+        <p className="mx-auto max-w-[22rem] text-sm leading-relaxed text-ink-muted">
           Ingresa para acceder al sistema de registro de horas.
         </p>
       </header>
 
       <form noValidate onSubmit={handleSubmit(onSubmit)}>
-        <div className="mb-5">
+        <div className="mb-4">
           <label htmlFor="email" className="mb-1.5 block text-sm font-semibold text-ink">
             Correo corporativo
           </label>
@@ -127,7 +127,7 @@ export function LoginForm() {
           </p>
         </div>
 
-        <div className="mb-5">
+        <div className="mb-4">
           <label htmlFor="password" className="mb-1.5 block text-sm font-semibold text-ink">
             Contraseña
           </label>
@@ -161,7 +161,7 @@ export function LoginForm() {
           </p>
         </div>
 
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-5 flex items-center justify-between">
           <label className="flex items-center gap-2 text-sm text-ink">
             <input
               type="checkbox"
@@ -184,30 +184,11 @@ export function LoginForm() {
           Iniciar sesión
         </Button>
 
-        <div className="my-6 grid grid-cols-[1fr_auto_1fr] items-center gap-5 text-[#7b8799]">
-          <span className="h-px bg-[#dfe3ea]" />
-          <small className="text-sm">o</small>
-          <span className="h-px bg-[#dfe3ea]" />
-        </div>
-
-        <button
-          type="button"
-          onClick={() =>
-            setStatus({
-              tone: "info",
-              text: "El acceso con Microsoft quedará conectado en una próxima etapa (Azure AD).",
-            })
-          }
-          className="btn-outline w-full"
-        >
-          Iniciar sesión con Microsoft
-        </button>
-
         {status ? (
           <div
             role="alert"
             aria-live="polite"
-            className={`mt-6 rounded-control border px-4 py-3 text-sm ${STATUS_STYLES[status.tone]}`}
+            className={`mt-5 rounded-control border px-4 py-3 text-sm ${STATUS_STYLES[status.tone]}`}
           >
             {status.text}
           </div>
