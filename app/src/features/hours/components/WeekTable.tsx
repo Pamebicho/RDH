@@ -15,9 +15,9 @@ interface WeekTableProps {
   onSetActiveDate: (date: string) => void;
 }
 
-// Nota: cada celda agrega su propia clase z-[n] (nunca dos a la vez) para evitar que
+// Nota: cada celda agrega su propia clase de z-index (nunca dos a la vez) para evitar que
 // Tailwind aplique un z-index impredecible cuando dos utilidades z-* conviven en un mismo elemento.
-const stickyHeadCell = "sticky top-0 bg-[#fbfcfe] shadow-[inset_0_-1px_0_#dfe5ee]";
+const stickyHeadCell = "sticky top-0 bg-[#fbfcfe] border-b border-[#dfe5ee]";
 const stickyFirstCol = "sticky left-0 min-w-[82px] w-[82px] bg-[#fbfcfe] text-center";
 
 // Solo se permite cargar horas con las flechitas del campo numérico (o las flechas del
@@ -55,19 +55,18 @@ export function WeekTable({
 }: WeekTableProps) {
   if (!columns.length) {
     return (
-      <div className="rounded-xl border border-dashed border-[#dfe5ee] bg-white p-6 text-center text-sm text-ink-muted">
+      <div className="m-4 rounded-xl border border-dashed border-[#dfe5ee] bg-white p-6 text-center text-sm text-ink-muted">
         Selecciona al menos un proyecto para poder cargar horas esta semana.
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-[#dfe5ee] bg-white shadow-[0_0.25rem_1rem_rgba(27,51,87,0.035)]">
-      <div className="max-h-[420px] overflow-auto">
-        <table className="w-full min-w-[860px] border-collapse text-sm text-[#10203c] [font-variant-numeric:tabular-nums]">
+    <div className="max-h-[68vh] overflow-auto rounded-xl">
+      <table className="w-full min-w-[860px] border-separate border-spacing-0 text-sm text-[#10203c] [font-variant-numeric:tabular-nums]">
           <thead>
             <tr>
-              <th scope="col" className={cn(stickyHeadCell, stickyFirstCol, "z-[6] px-3 py-2.5 font-bold")}>
+              <th scope="col" className={cn(stickyHeadCell, stickyFirstCol, "z-[6] rounded-tl-xl px-3 py-2.5 font-bold")}>
                 Día
               </th>
               {columns.map((columna) => (
@@ -82,7 +81,7 @@ export function WeekTable({
                   </span>
                 </th>
               ))}
-              <th scope="col" className={cn(stickyHeadCell, "z-[4] min-w-[92px] px-3 py-2.5 text-center font-semibold")}>
+              <th scope="col" className={cn(stickyHeadCell, "z-[4] min-w-[92px] rounded-tr-xl px-3 py-2.5 text-center font-semibold")}>
                 Total diario
               </th>
             </tr>
@@ -98,7 +97,6 @@ export function WeekTable({
                 <tr
                   key={day.date}
                   className={cn(
-                    "border-b border-[#e1e7ef]",
                     (day.weekend || day.feriado) && "bg-[#fcfcfd]",
                     isActive && "bg-[#f1f7ff]",
                     !day.weekend && !day.feriado && !isActive && "hover:bg-[#f8fbff]",
@@ -109,7 +107,7 @@ export function WeekTable({
                     title={day.feriado ? "Feriado" : undefined}
                     className={cn(
                       stickyFirstCol,
-                      "z-[3] px-3 py-2.5 font-normal",
+                      "z-[3] border-b border-[#e1e7ef] px-3 py-2.5 font-normal",
                       (day.weekend || day.feriado) && "text-[#d32f2f]",
                       day.feriado && "font-semibold",
                     )}
@@ -118,7 +116,7 @@ export function WeekTable({
                   </th>
 
                   {columns.map((columna) => (
-                    <td key={columna.id} className="px-3 py-2.5">
+                    <td key={columna.id} className="border-b border-[#e1e7ef] px-3 py-2.5">
                       <input
                         type="number"
                         min={0}
@@ -138,7 +136,7 @@ export function WeekTable({
 
                   <td
                     className={cn(
-                      "min-w-[92px] px-3 py-2.5 text-center font-bold",
+                      "border-b border-[#e1e7ef] min-w-[92px] px-3 py-2.5 text-center font-bold",
                       dayTotal > MAX_DAILY_HOURS && "bg-[#fff1f1] text-danger",
                     )}
                   >
@@ -151,24 +149,23 @@ export function WeekTable({
 
           <tfoot>
             <tr>
-              <th scope="row" className="sticky bottom-0 left-0 z-[5] bg-[#f9fbfe] px-3 py-2.5 text-center font-bold text-[#14233e] shadow-[inset_0_1px_0_#dfe5ee]">
+              <th scope="row" className="sticky bottom-0 left-0 z-[5] rounded-bl-xl border-t border-[#dfe5ee] bg-[#f9fbfe] px-3 py-2.5 text-center font-bold text-[#14233e]">
                 TOTAL
               </th>
               {columns.map((columna) => (
                 <td
                   key={columna.id}
-                  className="sticky bottom-0 z-[2] bg-[#f9fbfe] px-3 py-2.5 text-center text-sm font-bold text-[#0752bc] shadow-[inset_0_1px_0_#dfe5ee]"
+                  className="sticky bottom-0 z-[2] border-t border-[#dfe5ee] bg-[#f9fbfe] px-3 py-2.5 text-center text-sm font-bold text-[#0752bc]"
                 >
                   {formatHours(getColumnTotal(columna.id))}
                 </td>
               ))}
-              <td className="sticky bottom-0 z-[2] bg-[#f9fbfe] px-3 py-2.5 text-center text-sm font-bold text-[#0752bc] shadow-[inset_0_1px_0_#dfe5ee]">
+              <td className="sticky bottom-0 z-[2] rounded-br-xl border-t border-[#dfe5ee] bg-[#f9fbfe] px-3 py-2.5 text-center text-sm font-bold text-[#0752bc]">
                 {formatHours(registeredHours)}
               </td>
             </tr>
           </tfoot>
         </table>
-      </div>
     </div>
   );
 }

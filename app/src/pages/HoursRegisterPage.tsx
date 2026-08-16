@@ -9,9 +9,10 @@ import {
   useProyectosSeleccionados,
   useUpdateProyectosSeleccionados,
   useExportarPeriodo,
+  usePeriodoPlanilla,
 } from "@/features/hours/hooks";
 import { PeriodSelector } from "@/features/hours/components/PeriodSelector";
-import { WeekSection } from "@/features/hours/components/WeekSection";
+import { PeriodoSection } from "@/features/hours/components/PeriodoSection";
 import { ProjectsModal } from "@/features/hours/components/ProjectsModal";
 
 export function HoursRegisterPage() {
@@ -33,6 +34,7 @@ export function HoursRegisterPage() {
     semanasQuery.data ?? [],
     columnasInfo.columnas,
   );
+  const periodoPlanilla = usePeriodoPlanilla(trabajador?.id, periodoActual, semanasQuery.data ?? [], columnasInfo.columnas);
 
   useEffect(() => {
     if (!periodosQuery.data?.length) return;
@@ -65,7 +67,7 @@ export function HoursRegisterPage() {
           Registro de horas
         </h1>
         <p className="mt-1.5 text-sm text-[#314460]">
-          Registra tus horas trabajadas semana a semana para el período seleccionado.
+          Registra tus horas trabajadas para todo el período seleccionado.
         </p>
       </section>
 
@@ -79,6 +81,18 @@ export function HoursRegisterPage() {
         }}
         onExportPeriodo={() => exportarPeriodo.mutate()}
         isExporting={exportarPeriodo.isPending}
+        onSave={periodoPlanilla.save}
+        onSubmit={periodoPlanilla.submit}
+        isSaving={periodoPlanilla.isSaving}
+        isSubmitting={periodoPlanilla.isSubmitting}
+        canEdit={Boolean(periodoActual) && !periodoPlanilla.isSubmitted}
+        estado={periodoPlanilla.estado}
+        expectedHours={periodoPlanilla.expectedHours}
+        registeredHours={periodoPlanilla.registeredHours}
+        remainingHours={periodoPlanilla.remainingHours}
+        totales={periodoPlanilla.totales}
+        isSubmitted={periodoPlanilla.isSubmitted}
+        dirty={periodoPlanilla.dirty}
       />
 
       {!trabajador ? (
@@ -87,12 +101,14 @@ export function HoursRegisterPage() {
         </div>
       ) : semanasQuery.isLoading || columnasInfo.isLoading ? (
         <div className="rounded-xl border border-[#dfe5ee] bg-white p-10 text-center text-sm text-ink-muted shadow-[0_0.25rem_1rem_rgba(27,51,87,0.035)]">
-          Cargando semanas del período…
+          Cargando el período…
         </div>
+      ) : periodoActual ? (
+        <PeriodoSection periodoPlanilla={periodoPlanilla} columns={columnasInfo.columnas} />
       ) : (
-        (semanasQuery.data ?? []).map((semana) => (
-          <WeekSection key={semana.id} trabajadorId={trabajador.id} semana={semana} columns={columnasInfo.columnas} />
-        ))
+        <div className="rounded-xl border border-[#dfe5ee] bg-white p-10 text-center text-sm text-ink-muted shadow-[0_0.25rem_1rem_rgba(27,51,87,0.035)]">
+          Selecciona un período.
+        </div>
       )}
 
       <ProjectsModal

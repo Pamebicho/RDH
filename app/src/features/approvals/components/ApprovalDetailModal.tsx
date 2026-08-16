@@ -4,46 +4,46 @@ import { Button } from "@/components/ui/Button";
 import { WeekTable } from "@/features/hours/components/WeekTable";
 import { formatHours } from "@/features/hours/domain";
 import { formatDateCl } from "@/utils/date";
-import { usePlanillaDetalle, useAprobarPlanilla, useDevolverPlanilla, type PlanillaPendiente } from "../hooks";
+import { usePeriodoDetalle, useAprobarPeriodo, useDevolverPeriodo, type PeriodoPendiente } from "../hooks";
 
 interface ApprovalDetailModalProps {
-  planilla: PlanillaPendiente | null;
+  periodo: PeriodoPendiente | null;
   administradorId: string | undefined;
   onClose: () => void;
 }
 
-export function ApprovalDetailModal({ planilla, administradorId, onClose }: ApprovalDetailModalProps) {
+export function ApprovalDetailModal({ periodo, administradorId, onClose }: ApprovalDetailModalProps) {
   const [comentario, setComentario] = useState("");
 
-  const detalle = usePlanillaDetalle(
-    planilla?.id ?? null,
-    planilla?.semanaFechaInicio,
-    planilla?.semanaFechaFin,
+  const detalle = usePeriodoDetalle(
+    periodo?.planillaIds ?? [],
+    periodo?.periodoFechaInicio,
+    periodo?.periodoFechaFin,
   );
-  const aprobar = useAprobarPlanilla(administradorId);
-  const devolver = useDevolverPlanilla(administradorId);
+  const aprobar = useAprobarPeriodo(administradorId);
+  const devolver = useDevolverPeriodo(administradorId);
 
-  if (!planilla) return null;
+  if (!periodo) return null;
 
   function handleAprobar() {
-    if (!planilla) return;
-    aprobar.mutate(planilla.id, { onSuccess: onClose });
+    if (!periodo) return;
+    aprobar.mutate(periodo.planillaIds, { onSuccess: onClose });
   }
 
   function handleDevolver() {
-    if (!planilla) return;
+    if (!periodo) return;
     if (!comentario.trim()) {
       return;
     }
-    devolver.mutate({ planillaId: planilla.id, comentario: comentario.trim() }, { onSuccess: onClose });
+    devolver.mutate({ planillaIds: periodo.planillaIds, comentario: comentario.trim() }, { onSuccess: onClose });
   }
 
   return (
     <Modal
-      open={Boolean(planilla)}
+      open={Boolean(periodo)}
       onOpenChange={(open) => !open && onClose()}
-      title={`${planilla.trabajadorNombre} — Semana ${planilla.semanaNumero}`}
-      description={`${formatDateCl(planilla.semanaFechaInicio)} – ${formatDateCl(planilla.semanaFechaFin)} · ${planilla.periodoNombre}`}
+      title={`${periodo.trabajadorNombre} — ${periodo.periodoNombre}`}
+      description={`${formatDateCl(periodo.periodoFechaInicio)} – ${formatDateCl(periodo.periodoFechaFin)}`}
       size="lg"
       footer={
         <>
@@ -79,15 +79,15 @@ export function ApprovalDetailModal({ planilla, administradorId, onClose }: Appr
           <div className="grid grid-cols-3 gap-3 text-sm">
             <div className="rounded-control border border-border p-3">
               <span className="block text-xs text-ink-muted">Ordinarias</span>
-              <strong>{formatHours(planilla.totalOrdinarias)}</strong>
+              <strong>{formatHours(periodo.totalOrdinarias)}</strong>
             </div>
             <div className="rounded-control border border-border p-3">
               <span className="block text-xs text-ink-muted">Extraordinarias</span>
-              <strong>{formatHours(planilla.totalExtraordinarias)}</strong>
+              <strong>{formatHours(periodo.totalExtraordinarias)}</strong>
             </div>
             <div className="rounded-control border border-border p-3">
               <span className="block text-xs text-ink-muted">Ausencias</span>
-              <strong>{formatHours(planilla.totalAusencias)}</strong>
+              <strong>{formatHours(periodo.totalAusencias)}</strong>
             </div>
           </div>
 

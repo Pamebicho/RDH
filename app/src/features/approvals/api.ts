@@ -1,12 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-import type {
-  AprobacionPlanilla,
-  Periodo,
-  PlanillaSemanal,
-  RegistroHoras,
-  Semana,
-  Trabajador,
-} from "@/types/database.types";
+import type { AprobacionPlanilla, Periodo, PlanillaSemanal, Trabajador } from "@/types/database.types";
 
 /** Planillas ENVIADA visibles para el administrador actual (RLS ya limita a sus proyectos). */
 export async function fetchPlanillasEnviadas(): Promise<PlanillaSemanal[]> {
@@ -27,13 +20,6 @@ export async function fetchTrabajadoresPorIds(ids: string[]): Promise<Trabajador
   return data ?? [];
 }
 
-export async function fetchSemanasPorIds(ids: string[]): Promise<Semana[]> {
-  if (!ids.length) return [];
-  const { data, error } = await supabase.from("semanas").select("*").in("id", ids);
-  if (error) throw error;
-  return data ?? [];
-}
-
 export async function fetchPeriodosPorIds(ids: string[]): Promise<Periodo[]> {
   if (!ids.length) return [];
   const { data, error } = await supabase.from("periodos").select("*").in("id", ids);
@@ -41,22 +27,12 @@ export async function fetchPeriodosPorIds(ids: string[]): Promise<Periodo[]> {
   return data ?? [];
 }
 
-export async function fetchRegistrosDePlanilla(planillaId: string): Promise<RegistroHoras[]> {
-  const { data, error } = await supabase
-    .from("registros_horas")
-    .select("*")
-    .eq("planilla_semanal_id", planillaId)
-    .eq("anulado", false);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function fetchHistorialAprobaciones(planillaId: string): Promise<AprobacionPlanilla[]> {
+export async function fetchHistorialAprobacionesMultiple(planillaIds: string[]): Promise<AprobacionPlanilla[]> {
+  if (!planillaIds.length) return [];
   const { data, error } = await supabase
     .from("aprobaciones_planilla")
     .select("*")
-    .eq("planilla_semanal_id", planillaId)
+    .in("planilla_semanal_id", planillaIds)
     .order("fecha_hora", { ascending: false });
 
   if (error) throw error;

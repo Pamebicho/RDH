@@ -1,42 +1,46 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { fetchRegistrosPorPlanillas } from "@/features/home/api";
 import { fetchProyectosActivos, fetchTiposRegistroActivos } from "@/features/hours/api";
-import { createWeekDays, getDayTotal, getWeekTotal, type ColumnaRegistro, type HoursByDateAndColumn } from "@/features/hours/domain";
+import {
+  createWeekDays,
+  getColumnTotal,
+  getDayTotal,
+  getWeekTotal,
+  type ColumnaRegistro,
+  type HoursByDateAndColumn,
+} from "@/features/hours/domain";
 import type { RegistroHoras } from "@/types/database.types";
 import {
   aprobarPlanilla,
   devolverPlanilla,
-  fetchHistorialAprobaciones,
+  fetchHistorialAprobacionesMultiple,
   fetchPeriodosPorIds,
   fetchPlanillasEnviadas,
-  fetchRegistrosDePlanilla,
-  fetchSemanasPorIds,
   fetchTrabajadoresPorIds,
 } from "./api";
 
-export interface PlanillaPendiente {
-  id: string;
+export interface PeriodoPendiente {
+  trabajadorId: string;
   trabajadorNombre: string;
-  semanaNumero: number;
-  semanaFechaInicio: string;
-  semanaFechaFin: string;
+  periodoId: string;
   periodoNombre: string;
+  periodoFechaInicio: string;
+  periodoFechaFin: string;
+  planillaIds: string[];
   totalOrdinarias: number;
   totalExtraordinarias: number;
   totalAusencias: number;
   enviadaEn: string | null;
 }
 
-export function usePlanillasPendientes() {
+/** Agrupa las planillas semanales ENVIADA por trabajador+período: un solo período pendiente por trabajador. */
+export function usePeriodosPendientes() {
   const planillasQuery = useQuery({ queryKey: ["planillas-enviadas"], queryFn: fetchPlanillasEnviadas });
 
   const trabajadorIds = useMemo(
     () => [...new Set((planillasQuery.data ?? []).map((planilla) => planilla.trabajador_id))],
-    [planillasQuery.data],
-  );
-  const semanaIds = useMemo(
-    () => [...new Set((planillasQuery.data ?? []).map((planilla) => planilla.semana_id))],
     [planillasQuery.data],
   );
   const periodoIds = useMemo(
@@ -50,48 +54,58 @@ export function usePlanillasPendientes() {
     enabled: trabajadorIds.length > 0,
   });
 
-  const semanasQuery = useQuery({
-    queryKey: ["semanas-por-ids", semanaIds],
-    queryFn: () => fetchSemanasPorIds(semanaIds),
-    enabled: semanaIds.length > 0,
-  });
-
   const periodosQuery = useQuery({
     queryKey: ["periodos-por-ids", periodoIds],
     queryFn: () => fetchPeriodosPorIds(periodoIds),
     enabled: periodoIds.length > 0,
   });
 
-  const planillas: PlanillaPendiente[] = useMemo(() => {
+  const periodos: PeriodoPendiente[] = useMemo(() => {
     const trabajadorPorId = new Map((trabajadoresQuery.data ?? []).map((t) => [t.id, t]));
-    const semanaPorId = new Map((semanasQuery.data ?? []).map((s) => [s.id, s]));
     const periodoPorId = new Map((periodosQuery.data ?? []).map((p) => [p.id, p]));
+    const grupos = new Map<string, PeriodoPendiente>();
 
-    return (planillasQuery.data ?? []).map((planilla) => {
-      const trabajador = trabajadorPorId.get(planilla.trabajador_id);
-      const semana = semanaPorId.get(planilla.semana_id);
-      const periodo = periodoPorId.get(planilla.periodo_id);
-      const nombre = [trabajador?.nombres, trabajador?.apellidos].filter(Boolean).join(" ");
+    for (const planilla of planillasQuery.data ?? []) {
+      const clave = `${planilla.trabajador_id}|${planilla.periodo_id}`;
+      const existente = grupos.get(clave);
 
-      return {
-        id: planilla.id,
-        trabajadorNombre: nombre || trabajador?.correo_corporativo || "Trabajador",
-        semanaNumero: semana?.numero_semana ?? 0,
-        semanaFechaInicio: semana?.fecha_inicio ?? "",
-        semanaFechaFin: semana?.fecha_fin ?? "",
-        periodoNombre: periodo?.nombre ?? "",
-        totalOrdinarias: Number(planilla.total_ordinarias),
-        totalExtraordinarias: Number(planilla.total_extraordinarias),
-        totalAusencias: Number(planilla.total_ausencias),
-        enviadaEn: planilla.enviada_en,
-      };
-    });
-  }, [planillasQuery.data, trabajadoresQuery.data, semanasQuery.data, periodosQuery.data]);
+      if (!existente) {
+        const trabajador = trabajadorPorId.get(planilla.trabajador_id);
+        const periodo = periodoPorId.get(planilla.periodo_id);
+        const nombre = [trabajador?.nombres, trabajador?.apellidos].filter(Boolean).join(" ");
+
+        grupos.set(clave, {
+          trabajadorId: planilla.trabajador_id,
+          trabajadorNombre: nombre || trabajador?.correo_corporativo || "Trabajador",
+          periodoId: planilla.periodo_id,
+          periodoNombre: periodo?.nombre ?? "",
+          periodoFechaInicio: periodo?.fecha_inicio ?? "",
+          periodoFechaFin: periodo?.fecha_fin ?? "",
+          planillaIds: [planilla.id],
+          totalOrdinarias: Number(planilla.total_ordinarias),
+          totalExtraordinarias: Number(planilla.total_extraordinarias),
+          totalAusencias: Number(planilla.total_ausencias),
+          enviadaEn: planilla.enviada_en,
+        });
+        continue;
+      }
+
+      existente.planillaIds.push(planilla.id);
+      existente.totalOrdinarias += Number(planilla.total_ordinarias);
+      existente.totalExtraordinarias += Number(planilla.total_extraordinarias);
+      existente.totalAusencias += Number(planilla.total_ausencias);
+      if (planilla.enviada_en && (!existente.enviadaEn || planilla.enviada_en < existente.enviadaEn)) {
+        existente.enviadaEn = planilla.enviada_en;
+      }
+    }
+
+    return [...grupos.values()].sort((a, b) => a.trabajadorNombre.localeCompare(b.trabajadorNombre, "es"));
+  }, [planillasQuery.data, trabajadoresQuery.data, periodosQuery.data]);
 
   return {
-    planillas,
+    periodos,
     isLoading:
-      planillasQuery.isLoading || trabajadoresQuery.isFetching || semanasQuery.isFetching || periodosQuery.isFetching,
+      planillasQuery.isLoading || trabajadoresQuery.isFetching || periodosQuery.isFetching,
   };
 }
 
@@ -129,17 +143,18 @@ function buildColumnasDesdeRegistros(
   return columnas;
 }
 
-export function usePlanillaDetalle(planillaId: string | null, semanaFechaInicio?: string, semanaFechaFin?: string) {
+/** Detalle de TODAS las semanas (planillas) de un período pendiente, mostradas como una sola tabla. */
+export function usePeriodoDetalle(planillaIds: string[], periodoFechaInicio?: string, periodoFechaFin?: string) {
   const registrosQuery = useQuery({
-    queryKey: ["registros-planilla-detalle", planillaId],
-    queryFn: () => fetchRegistrosDePlanilla(planillaId as string),
-    enabled: Boolean(planillaId),
+    queryKey: ["registros-periodo-detalle", planillaIds],
+    queryFn: () => fetchRegistrosPorPlanillas(planillaIds),
+    enabled: planillaIds.length > 0,
   });
 
   const historialQuery = useQuery({
-    queryKey: ["historial-aprobaciones", planillaId],
-    queryFn: () => fetchHistorialAprobaciones(planillaId as string),
-    enabled: Boolean(planillaId),
+    queryKey: ["historial-aprobaciones", planillaIds],
+    queryFn: () => fetchHistorialAprobacionesMultiple(planillaIds),
+    enabled: planillaIds.length > 0,
   });
 
   const proyectosQuery = useQuery({ queryKey: ["proyectos-activos"], queryFn: fetchProyectosActivos });
@@ -162,8 +177,8 @@ export function usePlanillaDetalle(planillaId: string | null, semanaFechaInicio?
   }, [registrosQuery.data, columnas]);
 
   const days = useMemo(
-    () => (semanaFechaInicio && semanaFechaFin ? createWeekDays(semanaFechaInicio, semanaFechaFin) : []),
-    [semanaFechaInicio, semanaFechaFin],
+    () => (periodoFechaInicio && periodoFechaFin ? createWeekDays(periodoFechaInicio, periodoFechaFin) : []),
+    [periodoFechaInicio, periodoFechaFin],
   );
 
   return {
@@ -173,37 +188,39 @@ export function usePlanillaDetalle(planillaId: string | null, semanaFechaInicio?
     hours,
     historial: historialQuery.data ?? [],
     getDayTotal: (date: string) => getDayTotal(hours, columnas, date),
-    getColumnTotal: (columnId: string) =>
-      hours && columnId
-        ? Object.values(hours).reduce((total, day) => total + Number(day[columnId] || 0), 0)
-        : 0,
+    getColumnTotal: (columnId: string) => getColumnTotal(hours, columnId),
     weekTotal: getWeekTotal(days, hours, columnas),
   };
 }
 
-export function useAprobarPlanilla(administradorId: string | undefined) {
+/** Aprueba todas las semanas (planillas) del período de una vez. */
+export function useAprobarPeriodo(administradorId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (planillaId: string) => aprobarPlanilla(planillaId, administradorId as string),
+    mutationFn: (planillaIds: string[]) =>
+      Promise.all(planillaIds.map((planillaId) => aprobarPlanilla(planillaId, administradorId as string))),
     onSuccess: () => {
-      toast.success("Planilla aprobada.");
+      toast.success("Período aprobado.");
       void queryClient.invalidateQueries({ queryKey: ["planillas-enviadas"] });
     },
-    onError: () => toast.error("No fue posible aprobar la planilla."),
+    onError: () => toast.error("No fue posible aprobar el período."),
   });
 }
 
-export function useDevolverPlanilla(administradorId: string | undefined) {
+/** Devuelve todas las semanas (planillas) del período de una vez, con el mismo comentario. */
+export function useDevolverPeriodo(administradorId: string | undefined) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ planillaId, comentario }: { planillaId: string; comentario: string }) =>
-      devolverPlanilla(planillaId, administradorId as string, comentario),
+    mutationFn: ({ planillaIds, comentario }: { planillaIds: string[]; comentario: string }) =>
+      Promise.all(
+        planillaIds.map((planillaId) => devolverPlanilla(planillaId, administradorId as string, comentario)),
+      ),
     onSuccess: () => {
-      toast.success("Planilla devuelta al trabajador.");
+      toast.success("Período devuelto al trabajador.");
       void queryClient.invalidateQueries({ queryKey: ["planillas-enviadas"] });
     },
-    onError: () => toast.error("No fue posible devolver la planilla."),
+    onError: () => toast.error("No fue posible devolver el período."),
   });
 }

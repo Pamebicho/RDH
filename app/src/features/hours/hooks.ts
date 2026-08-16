@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useReducer, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import type { Periodo, RegistroHoras, Semana } from "@/types/database.types";
+import { fetchRegistrosPorPlanillas } from "@/features/home/api";
+import type { Periodo, PlanillaEstado, RegistroHoras, Semana } from "@/types/database.types";
 import {
   ensurePlanilla,
   fetchFeriados,
@@ -9,7 +10,6 @@ import {
   fetchPeriodos,
   fetchProyectosActivos,
   fetchProyectosSeleccionadosIds,
-  fetchRegistros,
   fetchRegistrosPeriodo,
   fetchSemanas,
   fetchTiposRegistroActivos,
@@ -180,55 +180,85 @@ function mapRegistrosToHours(registros: RegistroHoras[], columns: ColumnaRegistr
   return hours;
 }
 
-/** Estado y acciones de la tabla de UNA semana (planilla semanal) para el trabajador actual. */
-export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana, columns: ColumnaRegistro[]) {
+function derivarEstadoPeriodo(estados: PlanillaEstado[]): PlanillaEstado {
+  if (!estados.length) return "BORRADOR";
+  if (estados.some((estado) => estado === "DEVUELTA")) return "DEVUELTA";
+  if (estados.every((estado) => estado === "BORRADOR")) return "BORRADOR";
+  if (estados.every((estado) => estado === "APROBADA")) return "APROBADA";
+  return "ENVIADA";
+}
+
+/**
+ * Estado y acciones de la tabla de TODO el período (mes completo, ciclo 25 al 24) para el
+ * trabajador actual. Por debajo sigue existiendo una `planilla_semanal` por cada semana del
+ * período (así el esquema y las políticas RLS no cambian), pero Guardar/Enviar operan sobre
+ * todas esas semanas a la vez.
+ */
+export function usePeriodoPlanilla(
+  trabajadorId: string | undefined,
+  periodo: Periodo | undefined,
+  semanas: Semana[],
+  columns: ColumnaRegistro[],
+) {
   const queryClient = useQueryClient();
 
   const feriadosQuery = useQuery({
-    queryKey: ["feriados", semana.fecha_inicio, semana.fecha_fin],
-    queryFn: () => fetchFeriados(semana.fecha_inicio, semana.fecha_fin),
+    queryKey: ["feriados", periodo?.fecha_inicio, periodo?.fecha_fin],
+    queryFn: () => fetchFeriados((periodo as Periodo).fecha_inicio, (periodo as Periodo).fecha_fin),
+    enabled: Boolean(periodo),
   });
 
   const days = useMemo(
-    () => createWeekDays(semana.fecha_inicio, semana.fecha_fin, feriadosQuery.data),
-    [semana.fecha_inicio, semana.fecha_fin, feriadosQuery.data],
+    () => (periodo ? createWeekDays(periodo.fecha_inicio, periodo.fecha_fin, feriadosQuery.data) : []),
+    [periodo, feriadosQuery.data],
   );
 
-  const planillaQuery = useQuery({
-    queryKey: ["planilla", trabajadorId, semana.id],
-    queryFn: () => ensurePlanilla(trabajadorId as string, semana.id, semana.periodo_id),
-    enabled: Boolean(trabajadorId),
+  const semanaIds = useMemo(() => semanas.map((semana) => semana.id), [semanas]);
+
+  const planillasQuery = useQuery({
+    queryKey: ["planillas-periodo", trabajadorId, semanaIds],
+    queryFn: () =>
+      Promise.all(semanas.map((semana) => ensurePlanilla(trabajadorId as string, semana.id, semana.periodo_id))),
+    enabled: Boolean(trabajadorId) && semanas.length > 0,
   });
 
-  const planillaId = planillaQuery.data?.id;
-  const isSubmitted = (planillaQuery.data?.estado ?? "BORRADOR") !== "BORRADOR" && (planillaQuery.data?.estado ?? "BORRADOR") !== "DEVUELTA";
+  const planillaIdPorSemanaId = new Map((planillasQuery.data ?? []).map((p) => [p.semana_id, p.id]));
+  const planillaIds = (planillasQuery.data ?? []).map((p) => p.id);
+
+  function planillaIdParaFecha(fecha: string): string | undefined {
+    const semana = semanas.find((s) => s.fecha_inicio <= fecha && fecha <= s.fecha_fin);
+    return semana ? planillaIdPorSemanaId.get(semana.id) : undefined;
+  }
+
+  const estadoPeriodo = derivarEstadoPeriodo((planillasQuery.data ?? []).map((p) => p.estado));
+  const isSubmitted = estadoPeriodo !== "BORRADOR" && estadoPeriodo !== "DEVUELTA";
 
   const registrosQuery = useQuery({
-    queryKey: ["registros", planillaId],
-    queryFn: () => fetchRegistros(planillaId as string),
-    enabled: Boolean(planillaId),
+    queryKey: ["registros-periodo", planillaIds],
+    queryFn: () => fetchRegistrosPorPlanillas(planillaIds),
+    enabled: planillasQuery.isSuccess && planillaIds.length > 0,
   });
 
   const horasEsperadasQuery = useQuery({
-    queryKey: ["horas-esperadas", trabajadorId, semana.fecha_inicio],
-    queryFn: () => fetchHorasEsperadasPorDia(trabajadorId as string, semana.fecha_inicio),
-    enabled: Boolean(trabajadorId),
+    queryKey: ["horas-esperadas", trabajadorId, periodo?.fecha_inicio],
+    queryFn: () => fetchHorasEsperadasPorDia(trabajadorId as string, (periodo as Periodo).fecha_inicio),
+    enabled: Boolean(trabajadorId) && Boolean(periodo),
   });
 
   const [draft, dispatch] = useReducer(weekDraftReducer, initialWeekDraft);
-  const loadedForPlanillaId = useRef<string | null>(null);
+  const loadedForPeriodoId = useRef<string | null>(null);
 
-  const isReady = Boolean(planillaId) && registrosQuery.isSuccess;
+  const isReady = Boolean(periodo) && planillasQuery.isSuccess && registrosQuery.isSuccess;
 
   useEffect(() => {
-    if (!isReady || !planillaId || loadedForPlanillaId.current === planillaId) return;
+    if (!isReady || !periodo || loadedForPeriodoId.current === periodo.id) return;
 
-    loadedForPlanillaId.current = planillaId;
+    loadedForPeriodoId.current = periodo.id;
     dispatch({ type: "loaded", hours: mapRegistrosToHours(registrosQuery.data ?? [], columns) });
     // Las columnas pueden cambiar cuando el trabajador ajusta sus proyectos seleccionados;
-    // no queremos recargar el borrador cada vez que eso pase, solo al cambiar de planilla.
+    // no queremos recargar el borrador cada vez que eso pase, solo al cambiar de período.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReady, planillaId, registrosQuery.data]);
+  }, [isReady, periodo, registrosQuery.data]);
 
   const columnIds = useMemo(() => columns.map((columna) => columna.id), [columns]);
 
@@ -238,43 +268,59 @@ export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!planillaId || !trabajadorId) return;
+      if (!trabajadorId || !planillasQuery.data?.length) return;
 
-      const rows: RegistroUpsert[] = days.flatMap((day) =>
-        columns.map((columna) => ({
+      const rows: RegistroUpsert[] = days.flatMap((day) => {
+        const planillaId = planillaIdParaFecha(day.date);
+        if (!planillaId) return [];
+        return columns.map((columna) => ({
           planilla_semanal_id: planillaId,
           trabajador_id: trabajadorId,
           fecha: day.date,
           proyecto_id: columna.proyectoId,
           tipo_registro_id: columna.tipoRegistroId,
           horas: Number(draft.hours[day.date]?.[columna.id] || 0),
-        })),
-      );
+        }));
+      });
 
       await upsertRegistros(rows);
     },
     onSuccess: () => {
       dispatch({ type: "saved" });
-      toast.success(`Semana ${semana.numero_semana}: cambios guardados.`);
-      void queryClient.invalidateQueries({ queryKey: ["registros", planillaId] });
+      toast.success("Cambios guardados.");
+      void queryClient.invalidateQueries({ queryKey: ["registros-periodo", planillaIds] });
     },
     onError: () => {
-      toast.error("No fue posible guardar los cambios de esta semana.");
+      toast.error("No fue posible guardar los cambios del período.");
     },
   });
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      if (!planillaId) return;
+      if (!planillasQuery.data?.length) return;
       await saveMutation.mutateAsync();
-      await submitPlanilla(planillaId, totales);
+
+      await Promise.all(
+        planillasQuery.data.map((planilla) => {
+          const semana = semanas.find((s) => s.id === planilla.semana_id);
+          if (!semana) return Promise.resolve();
+
+          const hoursSemana: HoursByDateAndColumn = {};
+          for (const day of days) {
+            if (day.date >= semana.fecha_inicio && day.date <= semana.fecha_fin && draft.hours[day.date]) {
+              hoursSemana[day.date] = draft.hours[day.date];
+            }
+          }
+          return submitPlanilla(planilla.id, getTotalesPorCategoria(hoursSemana, columns));
+        }),
+      );
     },
     onSuccess: () => {
-      toast.success(`Semana ${semana.numero_semana} enviada para aprobación.`);
-      void queryClient.invalidateQueries({ queryKey: ["planilla", trabajadorId, semana.id] });
+      toast.success("Período enviado para aprobación.");
+      void queryClient.invalidateQueries({ queryKey: ["planillas-periodo", trabajadorId, semanaIds] });
     },
     onError: () => {
-      toast.error("No fue posible enviar la semana para aprobación.");
+      toast.error("No fue posible enviar el período para aprobación.");
     },
   });
 
@@ -294,9 +340,9 @@ export function useWeekPlanilla(trabajadorId: string | undefined, semana: Semana
   }
 
   return {
-    isLoading: planillaQuery.isLoading || registrosQuery.isLoading || horasEsperadasQuery.isLoading,
+    isLoading: planillasQuery.isLoading || registrosQuery.isLoading || horasEsperadasQuery.isLoading,
     days,
-    estado: planillaQuery.data?.estado ?? "BORRADOR",
+    estado: estadoPeriodo,
     isSubmitted,
     hours: draft.hours,
     activeDate: draft.activeDate,

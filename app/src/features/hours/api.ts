@@ -160,7 +160,7 @@ export async function fetchFeriados(fechaInicio: string, fechaFin: string): Prom
   return new Set((data ?? []).map((feriado) => feriado.fecha));
 }
 
-export async function fetchPlanilla(trabajadorId: string, semanaId: string): Promise<PlanillaSemanal | null> {
+async function fetchPlanilla(trabajadorId: string, semanaId: string): Promise<PlanillaSemanal | null> {
   const { data, error } = await supabase
     .from("planillas_semanales")
     .select("*")
@@ -190,16 +190,6 @@ export async function ensurePlanilla(
   return data;
 }
 
-export async function fetchRegistros(planillaId: string): Promise<RegistroHoras[]> {
-  const { data, error } = await supabase
-    .from("registros_horas")
-    .select("*")
-    .eq("planilla_semanal_id", planillaId)
-    .eq("anulado", false);
-
-  if (error) throw error;
-  return data ?? [];
-}
 
 export interface RegistroUpsert {
   planilla_semanal_id: string;
