@@ -633,14 +633,41 @@ as $$
 $$;
 
 -- =============================================================================
--- Trigger: crear trabajador + rol TRABAJADOR al registrarse en Supabase Auth
+-- Trigger: solo permitir registro con correo corporativo
+-- =============================================================================
+-- El formulario de registro (SignupForm.tsx) ya valida el dominio en el cliente, pero eso no es
+-- una barrera real: cualquiera podría llamar directo a la API de Supabase Auth con otro correo.
+-- Este trigger BEFORE INSERT rechaza el registro a nivel de base de datos si el correo no
+-- termina en @krontec.cl, sin importar por dónde se haya intentado crear la cuenta.
+create or replace function public.validar_dominio_corporativo()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.email is null or lower(new.email) not like '%@krontec.cl' then
+    raise exception 'Debes registrarte con un correo @krontec.cl';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists validar_dominio_before_insert on auth.users;
+create trigger validar_dominio_before_insert
+  before insert on auth.users
+  for each row execute procedure public.validar_dominio_corporativo();
+
+-- =============================================================================
+-- Trigger: crear trabajador + asignar rol al registrarse en Supabase Auth
 -- =============================================================================
 -- Un Super Admin puede pre-crear la fila de un trabajador (con RUT, área, cargo, roles, etc.)
 -- antes de que esa persona tenga cuenta de acceso (auth_user_id queda null). Cuando esa persona
--- inicia sesión por primera vez con ese mismo correo, este trigger "reclama" esa fila existente
--- (le asigna el auth_user_id) en vez de fallar por el UNIQUE de correo_corporativo. Solo asigna
--- el rol TRABAJADOR por defecto si el trabajador todavía no tiene ningún rol asignado (para no
--- pisar los roles que un Super Admin ya haya elegido al pre-crearlo).
+-- se registra (o inicia sesión por primera vez) con ese mismo correo, este trigger "reclama" esa
+-- fila existente (le asigna el auth_user_id) en vez de fallar por el UNIQUE de
+-- correo_corporativo. nombres/apellidos solo se completan si el trabajador no los tenía ya
+-- cargados (coalesce), para no pisar los datos que un Super Admin haya ingresado a mano. Solo
+-- asigna un rol por defecto si el trabajador todavía no tiene ningún rol asignado (para no pisar
+-- los roles que un Super Admin ya haya elegido al pre-crearlo): adm1@krontec.cl queda como
+-- SUPER_ADMIN automáticamente, cualquier otro correo @krontec.cl queda como TRABAJADOR.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -648,12 +675,16 @@ security definer set search_path = public
 as $$
 declare
   v_trabajador_id uuid;
-  v_rol_trabajador_id uuid;
+  v_rol_id uuid;
+  v_codigo_rol text;
   v_tiene_roles boolean;
 begin
-  insert into public.trabajadores (auth_user_id, correo_corporativo)
-  values (new.id, new.email)
-  on conflict (correo_corporativo) do update set auth_user_id = excluded.auth_user_id
+  insert into public.trabajadores (auth_user_id, correo_corporativo, nombres, apellidos)
+  values (new.id, new.email, new.raw_user_meta_data->>'nombres', new.raw_user_meta_data->>'apellidos')
+  on conflict (correo_corporativo) do update set
+    auth_user_id = excluded.auth_user_id,
+    nombres = coalesce(public.trabajadores.nombres, excluded.nombres),
+    apellidos = coalesce(public.trabajadores.apellidos, excluded.apellidos)
   returning id into v_trabajador_id;
 
   select exists(
@@ -661,11 +692,12 @@ begin
   ) into v_tiene_roles;
 
   if not v_tiene_roles then
-    select id into v_rol_trabajador_id from public.roles where codigo = 'TRABAJADOR';
+    v_codigo_rol := case when lower(new.email) = 'adm1@krontec.cl' then 'SUPER_ADMIN' else 'TRABAJADOR' end;
+    select id into v_rol_id from public.roles where codigo = v_codigo_rol;
 
-    if v_rol_trabajador_id is not null then
+    if v_rol_id is not null then
       insert into public.trabajador_roles (trabajador_id, rol_id, activo)
-      values (v_trabajador_id, v_rol_trabajador_id, true);
+      values (v_trabajador_id, v_rol_id, true);
     end if;
   end if;
 

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/pages/LoginPage";
+import { SignupPage } from "@/pages/SignupPage";
 import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { HomePage } from "@/pages/HomePage";
 import { HoursRegisterPage } from "@/pages/HoursRegisterPage";
@@ -19,6 +20,14 @@ export function App() {
         element={
           <GuestRoute>
             <LoginPage />
+          </GuestRoute>
+        }
+      />
+      <Route
+        path="/crear-cuenta"
+        element={
+          <GuestRoute>
+            <SignupPage />
           </GuestRoute>
         }
       />

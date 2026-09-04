@@ -33,3 +33,28 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
+
+export const signupSchema = z
+  .object({
+    nombres: z.string().trim().min(1, "Debes ingresar tu nombre."),
+    apellidos: z.string().trim().min(1, "Debes ingresar tu apellido."),
+    email: z
+      .string()
+      .trim()
+      .min(1, "Debes ingresar tu correo corporativo.")
+      .email("El correo ingresado no tiene un formato válido.")
+      .refine((value) => value.toLowerCase().endsWith(`@${CORPORATE_DOMAIN}`), {
+        message: `Debes utilizar un correo @${CORPORATE_DOMAIN}.`,
+      }),
+    password: z
+      .string()
+      .min(1, "Debes ingresar una contraseña.")
+      .min(6, "La contraseña debe tener al menos 6 caracteres."),
+    confirmPassword: z.string().min(1, "Debes confirmar tu contraseña."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Las contraseñas no coinciden.",
+    path: ["confirmPassword"],
+  });
+
+export type SignupFormValues = z.infer<typeof signupSchema>;
