@@ -51,7 +51,7 @@ export function PersonasTab() {
 
   const trabajadoresFiltrados = useMemo(() => {
     const termino = busqueda.trim().toLowerCase();
-    let lista = trabajadoresQuery.data ?? [];
+    let lista = (trabajadoresQuery.data ?? []).filter((trabajador) => trabajador.activo);
 
     if (termino) {
       lista = lista.filter((trabajador) => {
@@ -98,10 +98,6 @@ export function PersonasTab() {
   }
 
   function handleEliminarClick(trabajador: Trabajador) {
-    if (!trabajador.activo) {
-      setActivo.mutate({ id: trabajador.id, activo: true });
-      return;
-    }
     setTrabajadorAEliminar(trabajador);
   }
 
@@ -175,12 +171,9 @@ export function PersonasTab() {
               </thead>
               <tbody className="divide-y divide-[#e5eaf1]">
                 {trabajadoresFiltrados.map((trabajador, index) => (
-                  <tr key={trabajador.id} className={!trabajador.activo ? "opacity-50" : ""}>
+                  <tr key={trabajador.id}>
                     <td className="px-4 py-3 text-ink-muted">{index + 1}</td>
-                    <td className="px-4 py-3 font-medium text-ink">
-                      {trabajador.nombres || "—"}
-                      {!trabajador.activo ? <span className="ml-1 text-xs text-ink-muted">(Inactivo)</span> : null}
-                    </td>
+                    <td className="px-4 py-3 font-medium text-ink">{trabajador.nombres || "—"}</td>
                     <td className="px-4 py-3 text-ink">{trabajador.apellidos || "—"}</td>
                     <td className="px-4 py-3 text-ink">{trabajador.rut || "—"}</td>
                     <td className="px-4 py-3 text-ink">
@@ -217,12 +210,8 @@ export function PersonasTab() {
                         <button
                           type="button"
                           onClick={() => handleEliminarClick(trabajador)}
-                          title={trabajador.activo ? "Eliminar" : "Reactivar"}
-                          aria-label={
-                            trabajador.activo
-                              ? `Eliminar a ${trabajador.nombres ?? trabajador.correo_corporativo}`
-                              : `Reactivar a ${trabajador.nombres ?? trabajador.correo_corporativo}`
-                          }
+                          title="Eliminar"
+                          aria-label={`Eliminar a ${trabajador.nombres ?? trabajador.correo_corporativo}`}
                           className="rounded-md p-1.5 text-danger hover:bg-[#fdeeee]"
                         >
                           <Trash2 className="h-4 w-4" aria-hidden />
@@ -286,7 +275,7 @@ export function PersonasTab() {
           </span>
           <p className="text-sm text-ink">
             Se va a eliminar a <span className="font-semibold">{nombreAEliminar}</span>. Sus datos e historial
-            quedan guardados en el sistema, pero dejará de aparecer como trabajador activo. ¿Deseas continuar?
+            quedan guardados en el sistema, pero dejará de aparecer en esta lista. ¿Deseas continuar?
           </p>
         </div>
       </Modal>
