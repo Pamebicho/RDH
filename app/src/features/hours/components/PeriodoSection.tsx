@@ -15,6 +15,13 @@ export function PeriodoSection({ periodoPlanilla, columns }: PeriodoSectionProps
         <div className="p-6 text-center text-sm text-ink-muted">Cargando período…</div>
       ) : (
         <>
+          {periodoPlanilla.comentarioDevolucion ? (
+            <div className="mx-4 mt-4 rounded-control border border-[#f2c894] bg-[#fff0dc] p-3 text-sm text-[#7a3d00]">
+              <p className="font-semibold">El administrador devolvió este período para corrección</p>
+              <p className="mt-1">{periodoPlanilla.comentarioDevolucion}</p>
+            </div>
+          ) : null}
+
           <WeekTable
             days={periodoPlanilla.days}
             columns={columns}

@@ -4,11 +4,16 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/features/auth/useAuth";
+import { useWorkforce } from "@/features/workforce/useWorkforce";
+import { useDevolucionesPendientes } from "@/features/notifications/hooks";
 import { getInitials } from "@/utils/initials";
 
 export function Header({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
   const { session } = useAuth();
+  const { trabajador } = useWorkforce();
   const navigate = useNavigate();
+  const devolucionesQuery = useDevolucionesPendientes(trabajador?.id);
+  const devoluciones = devolucionesQuery.data ?? [];
 
   const fullName = (session?.user.user_metadata?.full_name as string | undefined) ?? session?.user.email ?? "";
   const email = session?.user.email ?? "";
@@ -16,6 +21,10 @@ export function Header({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
   async function handleLogout() {
     await supabase.auth.signOut();
     navigate("/login", { replace: true });
+  }
+
+  function irAPeriodoDevuelto(periodoId: string) {
+    navigate("/registro-horas", { state: { periodoId } });
   }
 
   return (
@@ -31,17 +40,47 @@ export function Header({ onOpenMobileMenu }: { onOpenMobileMenu: () => void }) {
 
       <div className="flex-1" />
 
-      <button
-        type="button"
-        onClick={() => toast("No tienes notificaciones nuevas.")}
-        aria-label="Notificaciones"
-        className="relative grid h-11 w-11 place-items-center rounded-full text-[#11284d] transition-colors hover:bg-[#f0f5fc] hover:text-krontec-blue"
-      >
-        <Bell className="h-5 w-5" aria-hidden />
-        <span className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-white bg-[#0b63d9] px-1 text-[0.65rem] font-bold text-white">
-          0
-        </span>
-      </button>
+      <DropdownMenu.Root>
+        <DropdownMenu.Trigger asChild>
+          <button
+            type="button"
+            aria-label="Notificaciones"
+            className="relative grid h-11 w-11 place-items-center rounded-full text-[#11284d] transition-colors hover:bg-[#f0f5fc] hover:text-krontec-blue"
+          >
+            <Bell className="h-5 w-5" aria-hidden />
+            {devoluciones.length > 0 ? (
+              <span className="absolute right-0.5 top-0.5 grid h-[18px] min-w-[18px] place-items-center rounded-full border-2 border-white bg-[#c9530f] px-1 text-[0.65rem] font-bold text-white">
+                {devoluciones.length}
+              </span>
+            ) : null}
+          </button>
+        </DropdownMenu.Trigger>
+
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content
+            align="end"
+            sideOffset={8}
+            className="z-[1030] w-[320px] max-w-[90vw] rounded-xl border border-border bg-white p-1.5 shadow-[0_1rem_3rem_rgba(15,31,59,0.18)]"
+          >
+            {devoluciones.length === 0 ? (
+              <div className="px-3 py-4 text-center text-sm text-ink-muted">No tienes notificaciones nuevas.</div>
+            ) : (
+              devoluciones.map((devolucion) => (
+                <DropdownMenu.Item
+                  key={devolucion.periodoId}
+                  onSelect={() => irAPeriodoDevuelto(devolucion.periodoId)}
+                  className="flex cursor-pointer flex-col gap-0.5 rounded-lg px-3 py-2.5 text-sm text-ink outline-none hover:bg-bg"
+                >
+                  <span className="font-semibold text-[#a54e00]">Período devuelto: {devolucion.periodoNombre}</span>
+                  {devolucion.comentario ? (
+                    <span className="line-clamp-2 text-xs text-ink-muted">{devolucion.comentario}</span>
+                  ) : null}
+                </DropdownMenu.Item>
+              ))
+            )}
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
 
       <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>

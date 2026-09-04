@@ -13,6 +13,7 @@ import {
   fetchRegistrosPeriodo,
   fetchSemanas,
   fetchTiposRegistroActivos,
+  fetchUltimaDevolucion,
   submitPlanilla,
   updateProyectosSeleccionados,
   upsertRegistros,
@@ -233,6 +234,12 @@ export function usePeriodoPlanilla(
   const estadoPeriodo = derivarEstadoPeriodo((planillasQuery.data ?? []).map((p) => p.estado));
   const isSubmitted = estadoPeriodo !== "BORRADOR" && estadoPeriodo !== "DEVUELTA";
 
+  const devolucionQuery = useQuery({
+    queryKey: ["ultima-devolucion", planillaIds],
+    queryFn: () => fetchUltimaDevolucion(planillaIds),
+    enabled: estadoPeriodo === "DEVUELTA" && planillaIds.length > 0,
+  });
+
   const registrosQuery = useQuery({
     queryKey: ["registros-periodo", planillaIds],
     queryFn: () => fetchRegistrosPorPlanillas(planillaIds),
@@ -344,6 +351,7 @@ export function usePeriodoPlanilla(
     days,
     estado: estadoPeriodo,
     isSubmitted,
+    comentarioDevolucion: estadoPeriodo === "DEVUELTA" ? (devolucionQuery.data?.comentario ?? null) : null,
     hours: draft.hours,
     activeDate: draft.activeDate,
     dirty: draft.dirty,

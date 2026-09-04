@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import type {
+  AprobacionPlanilla,
   Periodo,
   PlanillaSemanal,
   Proyecto,
@@ -236,6 +237,23 @@ export async function upsertRegistros(rows: RegistroUpsert[]): Promise<void> {
       if (insertError) throw insertError;
     }),
   );
+}
+
+/** Último comentario de devolución (accion DEVUELTA) entre las planillas dadas, para mostrárselo al trabajador. */
+export async function fetchUltimaDevolucion(planillaIds: string[]): Promise<AprobacionPlanilla | null> {
+  if (!planillaIds.length) return null;
+
+  const { data, error } = await supabase
+    .from("aprobaciones_planilla")
+    .select("*")
+    .in("planilla_semanal_id", planillaIds)
+    .eq("accion", "DEVUELTA")
+    .order("fecha_hora", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function submitPlanilla(planillaId: string, totales: TotalesPorCategoria): Promise<void> {

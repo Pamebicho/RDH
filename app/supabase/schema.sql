@@ -589,6 +589,49 @@ as $$
   );
 $$;
 
+-- El trabajador dueño de la planilla solo puede insertar/editar/borrar sus registros_horas
+-- mientras la planilla esté en un estado editable (BORRADOR o DEVUELTA). Antes esto solo se
+-- validaba en la UI (isSubmitted deshabilita los inputs); nada impedía llamar directo a la
+-- API de Supabase para editar una planilla ya ENVIADA o APROBADA.
+create or replace function public.trabajador_puede_editar_planilla(p_planilla_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.planillas_semanales p
+    where p.id = p_planilla_id
+      and p.trabajador_id = public.trabajador_actual_id()
+      and p.estado in ('BORRADOR', 'DEVUELTA')
+  );
+$$;
+
+-- Un Administrador que gestiona el proyecto de la planilla solo puede transicionarla
+-- (aprobar/devolver) mientras esté ENVIADA — coincide con el único flujo que usa la UI de
+-- Aprobaciones (aprobarPlanilla/devolverPlanilla solo actúan sobre planillas ENVIADA).
+create or replace function public.administrador_puede_transicionar_planilla(p_planilla_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.planillas_semanales p
+    where p.id = p_planilla_id
+      and p.estado = 'ENVIADA'
+      and p.trabajador_id <> public.trabajador_actual_id()
+      and exists (
+        select 1 from public.registros_horas rh
+        where rh.planilla_semanal_id = p.id
+          and rh.proyecto_id is not null
+          and public.administra_proyecto(rh.proyecto_id)
+      )
+  );
+$$;
+
 -- =============================================================================
 -- Trigger: crear trabajador + rol TRABAJADOR al registrarse en Supabase Auth
 -- =============================================================================
@@ -634,6 +677,47 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- =============================================================================
+-- Trigger: registrar automáticamente cambios en auditoria (tablas sensibles)
+-- =============================================================================
+-- security definer: corre con los privilegios del dueño de la función (el dueño de la
+-- tabla, exento de RLS), no con los del usuario autenticado. Por eso no existe una
+-- política de insert para "authenticated" en auditoria más abajo: el cliente nunca
+-- inserta filas de auditoría directamente, solo este trigger.
+create or replace function public.registrar_auditoria()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.auditoria (usuario_id, accion, tabla, registro_id, datos_anteriores, datos_nuevos)
+  values (
+    public.trabajador_actual_id(),
+    TG_OP,
+    TG_TABLE_NAME,
+    coalesce(new.id, old.id),
+    case when TG_OP in ('UPDATE', 'DELETE') then to_jsonb(old) else null end,
+    case when TG_OP in ('INSERT', 'UPDATE') then to_jsonb(new) else null end
+  );
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists trabajadores_auditoria on public.trabajadores;
+create trigger trabajadores_auditoria
+  after insert or update or delete on public.trabajadores
+  for each row execute procedure public.registrar_auditoria();
+
+drop trigger if exists planillas_auditoria on public.planillas_semanales;
+create trigger planillas_auditoria
+  after insert or update or delete on public.planillas_semanales
+  for each row execute procedure public.registrar_auditoria();
+
+drop trigger if exists registros_auditoria on public.registros_horas;
+create trigger registros_auditoria
+  after insert or update or delete on public.registros_horas
+  for each row execute procedure public.registrar_auditoria();
 
 -- =============================================================================
 -- Row Level Security
@@ -714,17 +798,31 @@ create policy "tipos_registro_write" on public.tipos_registro for all to authent
 -- --- trabajadores ---
 alter table public.trabajadores enable row level security;
 
+-- Un trabajador siempre ve su propia fila; ADMINISTRADOR/LECTOR/SUPER_ADMIN necesitan ver
+-- al resto (Aprobaciones, Reportes, Administración, RRHH). La app hoy no tiene una pantalla
+-- de "directorio" para el rol TRABAJADOR, así que no se le da visibilidad total: evita que
+-- cualquier cuenta pueda extraer RUT/correo/cargo de toda la empresa vía la API directa.
 drop policy if exists "trabajadores_select" on public.trabajadores;
-create policy "trabajadores_select" on public.trabajadores for select to authenticated using (true);
+create policy "trabajadores_select" on public.trabajadores for select to authenticated
+  using (
+    auth_user_id = auth.uid()
+    or public.tiene_rol('SUPER_ADMIN')
+    or public.tiene_rol('ADMINISTRADOR')
+    or public.tiene_rol('LECTOR')
+  );
 
 drop policy if exists "trabajadores_insert" on public.trabajadores;
 create policy "trabajadores_insert" on public.trabajadores for insert to authenticated
   with check (public.tiene_rol('SUPER_ADMIN'));
 
+-- Solo SUPER_ADMIN puede editar trabajadores. La app no ofrece auto-edición de perfil (el
+-- menú "Mi perfil" todavía no está implementado) — permitir auth_user_id = auth.uid() aquí
+-- dejaba que cualquier cuenta autenticada modificara su propio rut/cargo/area/activo/correo
+-- llamando directo a la API de Supabase, sin pasar por la UI de Administración.
 drop policy if exists "trabajadores_update" on public.trabajadores;
 create policy "trabajadores_update" on public.trabajadores for update to authenticated
-  using (auth_user_id = auth.uid() or public.tiene_rol('SUPER_ADMIN'))
-  with check (auth_user_id = auth.uid() or public.tiene_rol('SUPER_ADMIN'));
+  using (public.tiene_rol('SUPER_ADMIN'))
+  with check (public.tiene_rol('SUPER_ADMIN'));
 
 -- --- trabajador_roles ---
 alter table public.trabajador_roles enable row level security;
@@ -818,17 +916,20 @@ drop policy if exists "planillas_insert" on public.planillas_semanales;
 create policy "planillas_insert" on public.planillas_semanales for insert to authenticated
   with check (trabajador_id = public.trabajador_actual_id() or public.tiene_rol('SUPER_ADMIN'));
 
+-- El trabajador dueño solo puede editar su planilla mientras esté BORRADOR/DEVUELTA (p.ej.
+-- para enviarla). El administrador que gestiona el proyecto solo puede transicionarla
+-- mientras esté ENVIADA (aprobar/devolver). SUPER_ADMIN no tiene esta restricción.
 drop policy if exists "planillas_update" on public.planillas_semanales;
 create policy "planillas_update" on public.planillas_semanales for update to authenticated
   using (
-    trabajador_id = public.trabajador_actual_id()
+    public.trabajador_puede_editar_planilla(id)
     or public.tiene_rol('SUPER_ADMIN')
-    or public.puede_ver_planilla(id)
+    or public.administrador_puede_transicionar_planilla(id)
   )
   with check (
-    trabajador_id = public.trabajador_actual_id()
+    public.trabajador_puede_editar_planilla(id)
     or public.tiene_rol('SUPER_ADMIN')
-    or public.puede_ver_planilla(id)
+    or public.administrador_puede_transicionar_planilla(id)
   );
 
 -- --- registros_horas ---
@@ -843,18 +944,32 @@ create policy "registros_select" on public.registros_horas for select to authent
     or public.lector_puede_ver_planilla(planilla_semanal_id)
   );
 
+-- Solo se puede insertar/editar/borrar mientras la planilla dueña esté BORRADOR/DEVUELTA
+-- (ver trabajador_puede_editar_planilla). SUPER_ADMIN no tiene esta restricción.
 drop policy if exists "registros_insert" on public.registros_horas;
 create policy "registros_insert" on public.registros_horas for insert to authenticated
-  with check (trabajador_id = public.trabajador_actual_id() or public.tiene_rol('SUPER_ADMIN'));
+  with check (
+    (trabajador_id = public.trabajador_actual_id() and public.trabajador_puede_editar_planilla(planilla_semanal_id))
+    or public.tiene_rol('SUPER_ADMIN')
+  );
 
 drop policy if exists "registros_update" on public.registros_horas;
 create policy "registros_update" on public.registros_horas for update to authenticated
-  using (trabajador_id = public.trabajador_actual_id() or public.tiene_rol('SUPER_ADMIN'))
-  with check (trabajador_id = public.trabajador_actual_id() or public.tiene_rol('SUPER_ADMIN'));
+  using (
+    (trabajador_id = public.trabajador_actual_id() and public.trabajador_puede_editar_planilla(planilla_semanal_id))
+    or public.tiene_rol('SUPER_ADMIN')
+  )
+  with check (
+    (trabajador_id = public.trabajador_actual_id() and public.trabajador_puede_editar_planilla(planilla_semanal_id))
+    or public.tiene_rol('SUPER_ADMIN')
+  );
 
 drop policy if exists "registros_delete" on public.registros_horas;
 create policy "registros_delete" on public.registros_horas for delete to authenticated
-  using (trabajador_id = public.trabajador_actual_id() or public.tiene_rol('SUPER_ADMIN'));
+  using (
+    (trabajador_id = public.trabajador_actual_id() and public.trabajador_puede_editar_planilla(planilla_semanal_id))
+    or public.tiene_rol('SUPER_ADMIN')
+  );
 
 -- --- detalle_horas_extra ---
 alter table public.detalle_horas_extra enable row level security;
@@ -896,9 +1011,9 @@ create policy "aprobaciones_insert" on public.aprobaciones_planilla for insert t
 -- --- auditoria ---
 alter table public.auditoria enable row level security;
 
+-- Sin política de insert para "authenticated": las filas de auditoria las crea solo el
+-- trigger registrar_auditoria() (ver más arriba), nunca el cliente directamente.
 drop policy if exists "auditoria_insert" on public.auditoria;
-create policy "auditoria_insert" on public.auditoria for insert to authenticated
-  with check (usuario_id = public.trabajador_actual_id() or usuario_id is null);
 
 drop policy if exists "auditoria_select" on public.auditoria;
 create policy "auditoria_select" on public.auditoria for select to authenticated

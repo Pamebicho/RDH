@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { useWorkforce } from "@/features/workforce/useWorkforce";
 import {
@@ -17,8 +17,10 @@ import { ProjectsModal } from "@/features/hours/components/ProjectsModal";
 
 export function HoursRegisterPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { trabajador } = useWorkforce();
-  const [periodoId, setPeriodoId] = useState<string>("");
+  const periodoIdDesdeNotificacion = (location.state as { periodoId?: string } | null)?.periodoId;
+  const [periodoId, setPeriodoId] = useState<string>(periodoIdDesdeNotificacion ?? "");
   const [projectsModalOpen, setProjectsModalOpen] = useState(false);
 
   const periodosQuery = usePeriodos();
