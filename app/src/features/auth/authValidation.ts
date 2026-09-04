@@ -18,3 +18,18 @@ export const loginSchema = z.object({
 });
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
+
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(1, "Debes ingresar tu nueva contraseña.")
+      .min(6, "La contraseña debe tener al menos 6 caracteres."),
+    confirmPassword: z.string().min(1, "Debes confirmar tu nueva contraseña."),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Las contraseñas no coinciden.",
+    path: ["confirmPassword"],
+  });
+
+export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;

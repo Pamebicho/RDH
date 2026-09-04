@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "@/pages/LoginPage";
+import { ResetPasswordPage } from "@/pages/ResetPasswordPage";
 import { HomePage } from "@/pages/HomePage";
 import { HoursRegisterPage } from "@/pages/HoursRegisterPage";
 import { ApprovalsPage } from "@/pages/ApprovalsPage";
@@ -21,6 +22,7 @@ export function App() {
           </GuestRoute>
         }
       />
+      <Route path="/restablecer-contrasena" element={<ResetPasswordPage />} />
       <Route
         path="/inicio"
         element={

@@ -74,7 +74,9 @@ export function LoginForm() {
     }
 
     const email = getValues("email");
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/restablecer-contrasena`,
+    });
 
     if (error) {
       setStatus({ tone: "danger", text: "No fue posible enviar el correo de recuperación." });
