@@ -38,6 +38,9 @@ export const signupSchema = z
   .object({
     nombres: z.string().trim().min(1, "Debes ingresar tu nombre."),
     apellidos: z.string().trim().min(1, "Debes ingresar tu apellido."),
+    rut: z.string().trim().min(1, "Debes ingresar tu RUT."),
+    cargoId: z.string(),
+    jefatura: z.string().trim(),
     email: z
       .string()
       .trim()

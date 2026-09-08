@@ -48,6 +48,23 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["cargos"]["Insert"]>;
         Relationships: [];
       };
+      jefaturas: {
+        Row: {
+          id: string;
+          codigo: string;
+          nombre: string;
+          activo: boolean;
+          creado_en: string;
+        };
+        Insert: {
+          id?: string;
+          codigo: string;
+          nombre: string;
+          activo?: boolean;
+        };
+        Update: Partial<Database["public"]["Tables"]["jefaturas"]["Insert"]>;
+        Relationships: [];
+      };
       roles: {
         Row: {
           id: string;
@@ -531,6 +548,7 @@ export interface Database {
 
 export type Area = Database["public"]["Tables"]["areas"]["Row"];
 export type Cargo = Database["public"]["Tables"]["cargos"]["Row"];
+export type Jefatura = Database["public"]["Tables"]["jefaturas"]["Row"];
 export type Rol = Database["public"]["Tables"]["roles"]["Row"];
 export type Trabajador = Database["public"]["Tables"]["trabajadores"]["Row"];
 export type TrabajadorRol = Database["public"]["Tables"]["trabajador_roles"]["Row"];

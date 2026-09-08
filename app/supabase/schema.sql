@@ -60,6 +60,21 @@ create table if not exists public.cargos (
 );
 
 -- =============================================================================
+-- 2b. jefaturas
+-- =============================================================================
+-- Catálogo de jefaturas directas (personas), para ofrecerlo como lista desplegable en el
+-- registro de cuenta. trabajadores.jefatura sigue guardando el nombre como texto (no es una FK):
+-- una jefatura puede no tener cuenta en el sistema, y así se mantiene el modelo simple que ya
+-- existía. Este catálogo solo alimenta el selector.
+create table if not exists public.jefaturas (
+  id uuid primary key default gen_random_uuid(),
+  codigo varchar(30) not null unique,
+  nombre varchar(150) not null,
+  activo boolean not null default true,
+  creado_en timestamptz not null default now()
+);
+
+-- =============================================================================
 -- 3. roles
 -- =============================================================================
 create table if not exists public.roles (
@@ -663,8 +678,9 @@ create trigger validar_dominio_before_insert
 -- antes de que esa persona tenga cuenta de acceso (auth_user_id queda null). Cuando esa persona
 -- se registra (o inicia sesión por primera vez) con ese mismo correo, este trigger "reclama" esa
 -- fila existente (le asigna el auth_user_id) en vez de fallar por el UNIQUE de
--- correo_corporativo. nombres/apellidos solo se completan si el trabajador no los tenía ya
--- cargados (coalesce), para no pisar los datos que un Super Admin haya ingresado a mano. Solo
+-- correo_corporativo. nombres/apellidos/rut/cargo_id/jefatura (enviados como raw_user_meta_data
+-- desde SignupForm.tsx) solo se completan si el trabajador no los tenía ya cargados (coalesce),
+-- para no pisar los datos que un Super Admin haya ingresado a mano. Solo
 -- asigna un rol por defecto si el trabajador todavía no tiene ningún rol asignado (para no pisar
 -- los roles que un Super Admin ya haya elegido al pre-crearlo): adm1@krontec.cl queda como
 -- SUPER_ADMIN automáticamente, cualquier otro correo @krontec.cl queda como TRABAJADOR.
@@ -679,12 +695,23 @@ declare
   v_codigo_rol text;
   v_tiene_roles boolean;
 begin
-  insert into public.trabajadores (auth_user_id, correo_corporativo, nombres, apellidos)
-  values (new.id, new.email, new.raw_user_meta_data->>'nombres', new.raw_user_meta_data->>'apellidos')
+  insert into public.trabajadores (auth_user_id, correo_corporativo, nombres, apellidos, rut, cargo_id, jefatura)
+  values (
+    new.id,
+    new.email,
+    new.raw_user_meta_data->>'nombres',
+    new.raw_user_meta_data->>'apellidos',
+    nullif(new.raw_user_meta_data->>'rut', ''),
+    nullif(new.raw_user_meta_data->>'cargo_id', '')::uuid,
+    nullif(new.raw_user_meta_data->>'jefatura', '')
+  )
   on conflict (correo_corporativo) do update set
     auth_user_id = excluded.auth_user_id,
     nombres = coalesce(public.trabajadores.nombres, excluded.nombres),
-    apellidos = coalesce(public.trabajadores.apellidos, excluded.apellidos)
+    apellidos = coalesce(public.trabajadores.apellidos, excluded.apellidos),
+    rut = coalesce(public.trabajadores.rut, excluded.rut),
+    cargo_id = coalesce(public.trabajadores.cargo_id, excluded.cargo_id),
+    jefatura = coalesce(public.trabajadores.jefatura, excluded.jefatura)
   returning id into v_trabajador_id;
 
   select exists(
@@ -758,6 +785,7 @@ create trigger registros_auditoria
 -- --- Catálogos de solo lectura para autenticados, escritura solo SUPER_ADMIN ---
 alter table public.areas enable row level security;
 alter table public.cargos enable row level security;
+alter table public.jefaturas enable row level security;
 alter table public.roles enable row level security;
 alter table public.proyectos enable row level security;
 alter table public.periodos enable row level security;
@@ -773,8 +801,19 @@ drop policy if exists "areas_write" on public.areas;
 create policy "areas_write" on public.areas for all to authenticated
   using (public.tiene_rol('SUPER_ADMIN')) with check (public.tiene_rol('SUPER_ADMIN'));
 
+-- Se permite también a "anon" (sin sesión) porque el formulario de registro (/crear-cuenta)
+-- muestra un selector de cargos antes de que la persona tenga cuenta creada. Es un catálogo de
+-- nombres de cargo, no información sensible.
 drop policy if exists "cargos_select" on public.cargos;
-create policy "cargos_select" on public.cargos for select to authenticated using (true);
+create policy "cargos_select" on public.cargos for select to anon, authenticated using (true);
+-- Mismo criterio que cargos: el registro (/crear-cuenta) muestra un selector de jefaturas antes
+-- de que la persona tenga sesión, así que "anon" también puede leer este catálogo.
+drop policy if exists "jefaturas_select" on public.jefaturas;
+create policy "jefaturas_select" on public.jefaturas for select to anon, authenticated using (true);
+drop policy if exists "jefaturas_write" on public.jefaturas;
+create policy "jefaturas_write" on public.jefaturas for all to authenticated
+  using (public.tiene_rol('SUPER_ADMIN')) with check (public.tiene_rol('SUPER_ADMIN'));
+
 drop policy if exists "cargos_write" on public.cargos;
 create policy "cargos_write" on public.cargos for all to authenticated
   using (public.tiene_rol('SUPER_ADMIN')) with check (public.tiene_rol('SUPER_ADMIN'));
@@ -1071,6 +1110,62 @@ insert into public.roles (codigo, nombre, descripcion) values
   ('LECTOR', 'Lector', 'Acceso de solo lectura a reportes según su alcance asignado.'),
   ('SUPER_ADMIN', 'Super administrador', 'Acceso total, gestiona catálogos y roles.')
 on conflict (codigo) do update set nombre = excluded.nombre, descripcion = excluded.descripcion;
+
+-- Cargos vigentes de Krontec, tomados de Info/Cargo.xlsx (columna "Nombre"). Alimentan el
+-- selector de Cargo del formulario de registro (/crear-cuenta). Un Super Admin puede seguir
+-- creando otros a mano desde Configuración > Personas al editar un trabajador.
+insert into public.cargos (codigo, nombre) values
+  ('ADMINISTRADOR_DE_CONTRATOS', 'Administrador de Contratos'),
+  ('ADMINISTRADOR_DEL_CIK', 'Administrador del CIK'),
+  ('ADMINISTRATIVO_DE_GESTION_LOG', 'Administrativo de Gestión Logística'),
+  ('ENCARGADO_COMPRAS_BODEGA_LOG', 'Encargado de Compras, Bodega y Logística'),
+  ('ESPECIALISTA_MONTAJES_LICITAC', 'Especialista de Montajes y Asistente de Licitaciones'),
+  ('ESPECIALISTA_DE_PROYECTOS', 'Especialista de Proyectos'),
+  ('ESPECIALISTA_EN_AUTOMATIZACION', 'Especialista en Automatización'),
+  ('ESPECIALISTA_REDES_TELECOM', 'Especialista en Redes y Telecomunicaciones'),
+  ('GERENTE_DE_OPERACIONES', 'Gerente de Operaciones'),
+  ('INGENIERA_ASISTENTE_PROYECTO', 'Ingeniera Asistente de Proyecto'),
+  ('INGENIERA_DE_PROYECTOS', 'Ingeniera de Proyectos'),
+  ('ING_CONTROL_DOCS_Y_PROYECTOS', 'Ingeniero/a de Control de Documentos y Proyectos'),
+  ('ING_ANALISIS_DE_PROPUESTAS', 'Ingeniero de Análisis de Propuestas'),
+  ('INGENIERO_DE_APLICACION', 'Ingeniero de Aplicación'),
+  ('ING_COMUNICACIONES_Y_TI', 'Ingeniero de Comunicaciones y TI'),
+  ('ING_ESTUDIO_DE_PROPUESTAS', 'Ingeniero de Estudio de Propuestas'),
+  ('INGENIERO_DE_PROYECTOS', 'Ingeniero de Proyectos'),
+  ('ING_ELECTRICIDAD_ELECTRONICA', 'Ingeniero en Electricidad y Electrónica'),
+  ('ING_ESPECIALISTA_PROYECTOS', 'Ingeniero Especialista de Proyectos'),
+  ('INGENIERO_ESPECIALISTA_DRT', 'Ingeniero Especialista DRT'),
+  ('ING_ESP_CONTROL_AUTOMATIZACION', 'Ingeniero Especialista en Control de Automatización Industrial'),
+  ('ING_ESP_SISTEMA_DE_CONTROL', 'Ingeniero Especialista en Sistema de Control'),
+  ('INGENIERO_ESPECIALISTA_MEL', 'Ingeniero Especialista MEL'),
+  ('INGENIERO_ESPECIALISTA_SENIOR', 'Ingeniero Especialista Senior'),
+  ('INGENIERO_PROYECTISTA', 'Ingeniero Proyectista'),
+  ('ING_SENIOR_COMUNIC_PROYECTOS', 'Ingeniero Senior de Comunicaciones y Proyectos'),
+  ('INGENIERO_SENIOR_DE_PROYECTOS', 'Ingeniero Senior de Proyectos'),
+  ('ING_TECNICO_ELECTRONICA_INDEP', 'Ingeniero Técnico en Electrónica Independiente'),
+  ('INSTRUMENTISTA', 'Instrumentista'),
+  ('JEFE_AREA_GESTION_ENERGIA', 'Jefe del Área de Gestión de Energía'),
+  ('JEFE_DE_PLANTA_CIK', 'Jefe de Planta CIK'),
+  ('JEFE_DE_TERRENO', 'Jefe de Terreno'),
+  ('MAESTRO_MAYOR_INSTRUM_CONTROL', 'Maestro Mayor Especialista en Instrumentación y Control'),
+  ('PLANIFICADOR_GESTOR_PROYECTOS', 'Planificador/a y Gestor/a de Proyectos'),
+  ('SUPERVISOR_DE_TERRENO', 'Supervisor de Terreno'),
+  ('TABLERISTA', 'Tablerista'),
+  ('TECNICO_DE_PROYECTOS', 'Técnico de Proyectos'),
+  ('TECNOLOGA_DE_PROYECTOS', 'Tecnóloga de Proyectos'),
+  ('TECNOLOGO_DE_PROYECTOS', 'Tecnólogo de Proyectos')
+on conflict (codigo) do update set nombre = excluded.nombre, activo = true;
+
+-- Jefaturas vigentes, tomadas de Info/Cargo.xlsx (columna "jefatura").
+insert into public.jefaturas (codigo, nombre) values
+  ('PEDRO_CUETO', 'Pedro Cueto'),
+  ('JORGE_VEGA', 'Jorge Vega'),
+  ('ERICK_URBINA', 'Erick Urbina'),
+  ('FELIPE_PARODI', 'Felipe Parodi'),
+  ('JOSE_LEPILAF', 'José Lepilaf'),
+  ('DANILO_LEPILAF', 'Danilo Lepilaf'),
+  ('NATHALY_RUIZ', 'Nathaly Ruiz')
+on conflict (codigo) do update set nombre = excluded.nombre, activo = true;
 
 insert into public.tipos_registro
   (codigo, nombre, categoria, requiere_proyecto, completa_jornada, es_hora_extra, orden_visual) values

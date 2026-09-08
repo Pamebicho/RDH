@@ -6,6 +6,7 @@ import { Eye, EyeOff, Lock, Mail, UserPlus } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/Button";
 import { CORPORATE_DOMAIN } from "@/config/env";
+import { useCargos, useJefaturas } from "@/features/admin/hooks";
 import { signupSchema, type SignupFormValues } from "./authValidation";
 
 type StatusTone = "success" | "danger" | "info";
@@ -23,6 +24,8 @@ const STATUS_STYLES: Record<StatusTone, string> = {
 
 export function SignupForm() {
   const navigate = useNavigate();
+  const cargosQuery = useCargos();
+  const jefaturasQuery = useJefaturas();
   const [showPassword, setShowPassword] = useState(false);
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
@@ -32,20 +35,45 @@ export function SignupForm() {
     formState: { errors, isSubmitting },
   } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { nombres: "", apellidos: "", email: "", password: "", confirmPassword: "" },
+    defaultValues: {
+      nombres: "",
+      apellidos: "",
+      rut: "",
+      cargoId: "",
+      jefatura: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
   });
 
   const onSubmit = async (values: SignupFormValues) => {
     setStatus(null);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: values.email,
       password: values.password,
-      options: { data: { nombres: values.nombres, apellidos: values.apellidos } },
+      options: {
+        data: {
+          nombres: values.nombres,
+          apellidos: values.apellidos,
+          rut: values.rut,
+          cargo_id: values.cargoId || null,
+          jefatura: values.jefatura,
+        },
+      },
     });
 
     if (error) {
       setStatus({ tone: "danger", text: "No fue posible crear tu cuenta. Verifica tus datos e intenta nuevamente." });
+      return;
+    }
+
+    if (!data.session) {
+      setStatus({
+        tone: "success",
+        text: "Te enviamos un correo de verificación a tu correo corporativo. Confírmalo para poder iniciar sesión.",
+      });
       return;
     }
 
@@ -103,6 +131,53 @@ export function SignupForm() {
               {errors.apellidos?.message}
             </p>
           </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="rut" className="mb-1.5 block text-sm font-semibold text-ink">
+              RUT
+            </label>
+            <input
+              id="rut"
+              placeholder="12.345.678-9"
+              className="form-input"
+              aria-invalid={Boolean(errors.rut)}
+              aria-describedby="rut-error"
+              {...register("rut")}
+            />
+            <p id="rut-error" className="field-error" aria-live="polite">
+              {errors.rut?.message}
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="cargoId" className="mb-1.5 block text-sm font-semibold text-ink">
+              Cargo
+            </label>
+            <select id="cargoId" className="form-input" {...register("cargoId")}>
+              <option value="">Selecciona un cargo…</option>
+              {(cargosQuery.data ?? []).map((cargo) => (
+                <option key={cargo.id} value={cargo.id}>
+                  {cargo.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mb-4">
+          <label htmlFor="jefatura" className="mb-1.5 block text-sm font-semibold text-ink">
+            Jefatura
+          </label>
+          <select id="jefatura" className="form-input" {...register("jefatura")}>
+            <option value="">Selecciona tu jefatura…</option>
+            {(jefaturasQuery.data ?? []).map((jefatura) => (
+              <option key={jefatura.id} value={jefatura.nombre}>
+                {jefatura.nombre}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="mb-4">

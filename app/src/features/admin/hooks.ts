@@ -14,6 +14,10 @@ export function useCargos() {
   return useCatalog("cargos", api.fetchCargos);
 }
 
+export function useJefaturas() {
+  return useCatalog("jefaturas", api.fetchJefaturas);
+}
+
 export function useAdminProyectos() {
   return useCatalog("admin-proyectos", api.fetchProyectos);
 }

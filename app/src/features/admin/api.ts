@@ -1,5 +1,15 @@
 import { supabase } from "@/lib/supabaseClient";
-import type { Area, Cargo, Jornada, JornadaDia, Proyecto, Rol, Trabajador, TrabajadorRol } from "@/types/database.types";
+import type {
+  Area,
+  Cargo,
+  Jefatura,
+  Jornada,
+  JornadaDia,
+  Proyecto,
+  Rol,
+  Trabajador,
+  TrabajadorRol,
+} from "@/types/database.types";
 
 // --- áreas ---
 export async function fetchAreas(): Promise<Area[]> {
@@ -23,6 +33,13 @@ export async function fetchCargos(): Promise<Cargo[]> {
 /** Busca un cargo por nombre (sin distinguir mayúsculas); si no existe, lo crea. */
 export async function obtenerOCrearCargo(nombre: string): Promise<string> {
   return obtenerOCrearCatalogo("cargos", nombre, 30);
+}
+
+// --- jefaturas ---
+export async function fetchJefaturas(): Promise<Jefatura[]> {
+  const { data, error } = await supabase.from("jefaturas").select("*").order("nombre");
+  if (error) throw error;
+  return data ?? [];
 }
 
 function generarCodigoCatalogo(nombre: string, maxLen: number): string {
