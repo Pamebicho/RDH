@@ -157,11 +157,13 @@ export function SignupForm() {
             </label>
             <select id="cargoId" className="form-input" {...register("cargoId")}>
               <option value="">Selecciona un cargo…</option>
-              {(cargosQuery.data ?? []).map((cargo) => (
-                <option key={cargo.id} value={cargo.id}>
-                  {cargo.nombre}
-                </option>
-              ))}
+              {(cargosQuery.data ?? [])
+                .filter((cargo) => cargo.activo)
+                .map((cargo) => (
+                  <option key={cargo.id} value={cargo.id}>
+                    {cargo.nombre}
+                  </option>
+                ))}
             </select>
           </div>
         </div>
@@ -172,11 +174,13 @@ export function SignupForm() {
           </label>
           <select id="jefatura" className="form-input" {...register("jefatura")}>
             <option value="">Selecciona tu jefatura…</option>
-            {(jefaturasQuery.data ?? []).map((jefatura) => (
-              <option key={jefatura.id} value={jefatura.nombre}>
-                {jefatura.nombre}
-              </option>
-            ))}
+            {(jefaturasQuery.data ?? [])
+              .filter((jefatura) => jefatura.activo)
+              .map((jefatura) => (
+                <option key={jefatura.id} value={jefatura.nombre}>
+                  {jefatura.nombre}
+                </option>
+              ))}
           </select>
         </div>
 

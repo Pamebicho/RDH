@@ -1114,6 +1114,13 @@ on conflict (codigo) do update set nombre = excluded.nombre, descripcion = exclu
 -- Cargos vigentes de Krontec, tomados de Info/Cargo.xlsx (columna "Nombre"). Alimentan el
 -- selector de Cargo del formulario de registro (/crear-cuenta). Un Super Admin puede seguir
 -- creando otros a mano desde Configuración > Personas al editar un trabajador.
+--
+-- Se desactivan todos primero y el insert de abajo reactiva solo los oficiales: así los cargos
+-- heredados de la importación de julio (seed_datos_julio_2026.sql, que los creó EN MAYÚSCULAS y
+-- con nombres duplicados) dejan de aparecer en el selector de registro, sin borrarlos todavía
+-- (más abajo se reasignan y recién ahí se eliminan los que ya no usa nadie).
+update public.cargos set activo = false;
+
 insert into public.cargos (codigo, nombre) values
   ('ADMINISTRADOR_DE_CONTRATOS', 'Administrador de Contratos'),
   ('ADMINISTRADOR_DEL_CIK', 'Administrador del CIK'),
@@ -1155,6 +1162,51 @@ insert into public.cargos (codigo, nombre) values
   ('TECNOLOGA_DE_PROYECTOS', 'Tecnóloga de Proyectos'),
   ('TECNOLOGO_DE_PROYECTOS', 'Tecnólogo de Proyectos')
 on conflict (codigo) do update set nombre = excluded.nombre, activo = true;
+
+-- Los trabajadores importados en julio quedaron apuntando a cargos en MAYÚSCULAS que son el
+-- mismo cargo que uno de los oficiales de arriba (escrito distinto). Se les reasigna el cargo
+-- oficial para no dejar duplicados en el catálogo.
+update public.trabajadores t
+set cargo_id = oficial.id
+from public.cargos antiguo
+join (values
+  ('ADMINISTRADOR DE CONTRATOS', 'ADMINISTRADOR_DE_CONTRATOS'),
+  ('ADMINISTRATIVO DE GESTIÓN LOGÍSTICA', 'ADMINISTRATIVO_DE_GESTION_LOG'),
+  ('ENCARGADO DE COMPRAS, BODEGA Y LOGISTICA', 'ENCARGADO_COMPRAS_BODEGA_LOG'),
+  ('ESPECIALISTA DE PROYECTOS', 'ESPECIALISTA_DE_PROYECTOS'),
+  ('ESPECIALISTA EN REDES Y TELECOMUNICACIONES', 'ESPECIALISTA_REDES_TELECOM'),
+  ('INGENIERA DE PROYECTOS', 'INGENIERA_DE_PROYECTOS'),
+  ('INGENIERO ASISTENTE DE PROYECTOS', 'INGENIERA_ASISTENTE_PROYECTO'),
+  ('INGENIERO DE COMUNICACIONES TI', 'ING_COMUNICACIONES_Y_TI'),
+  ('INGENIERO DE COMUNICACIONES Y TI', 'ING_COMUNICACIONES_Y_TI'),
+  ('INGENIERO DE CONTROL DE DOCUMENTOS Y PROYECTOS', 'ING_CONTROL_DOCS_Y_PROYECTOS'),
+  ('INGENIERO/A DE CONTROL DE DOCUMENTOS Y PROYECTOS', 'ING_CONTROL_DOCS_Y_PROYECTOS'),
+  ('INGENIERO DE PROYECTOS', 'INGENIERO_DE_PROYECTOS'),
+  ('INGENIERO ESPECIALISTA DE PROYECTOS', 'ING_ESPECIALISTA_PROYECTOS'),
+  ('INGENIERO ESPECIALISTA EN CONTROL AUTOMATIZACION INDUSTRIAL', 'ING_ESP_CONTROL_AUTOMATIZACION'),
+  ('INGENIERO ESPECIALISTA EN CONTROL DE AUTOMATIZACION', 'ING_ESP_CONTROL_AUTOMATIZACION'),
+  ('INGENIERO ESPECIALISTA MEL', 'INGENIERO_ESPECIALISTA_MEL'),
+  ('INGENIERO SENIOR DE COMUNICACIONES Y PROYECTOS', 'ING_SENIOR_COMUNIC_PROYECTOS'),
+  ('INGENIERO SENIOR DE PROYECTOS', 'INGENIERO_SENIOR_DE_PROYECTOS'),
+  ('INGENIERO TÉCNICO EN ELECTRONICA IND.', 'ING_TECNICO_ELECTRONICA_INDEP'),
+  ('INSTRUMENTISTA', 'INSTRUMENTISTA'),
+  ('JEFE DE TERRENO', 'JEFE_DE_TERRENO'),
+  ('MAESTRO MAYOR ESPECIALISTA EN INSTRUMENT. Y CONTROL', 'MAESTRO_MAYOR_INSTRUM_CONTROL'),
+  ('PLANIFICADOR Y GESTOR DE PROYECTOS', 'PLANIFICADOR_GESTOR_PROYECTOS'),
+  ('SUPERVISOR DE TERRENO', 'SUPERVISOR_DE_TERRENO'),
+  ('TABLERISTA', 'TABLERISTA'),
+  ('TÉCNICO DE PROYECTOS', 'TECNICO_DE_PROYECTOS')
+) as mapa(nombre_antiguo, codigo_oficial) on mapa.nombre_antiguo = antiguo.nombre
+join public.cargos oficial on oficial.codigo = mapa.codigo_oficial
+where t.cargo_id = antiguo.id
+  and antiguo.id <> oficial.id;
+
+-- Ya reasignados: se eliminan los cargos que no están en la lista oficial y que ya no usa nadie.
+-- Los que sigan asignados a alguien (cargos antiguos sin equivalente en el Excel) se conservan
+-- desactivados, para que un Super Admin decida qué hacer con ellos sin perder el dato.
+delete from public.cargos c
+where c.activo = false
+  and not exists (select 1 from public.trabajadores t where t.cargo_id = c.id);
 
 -- Jefaturas vigentes, tomadas de Info/Cargo.xlsx (columna "jefatura").
 insert into public.jefaturas (codigo, nombre) values
