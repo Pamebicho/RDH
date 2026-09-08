@@ -20,10 +20,34 @@ export function diasRestantes(fechaFin: string): number {
   return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 }
 
-/** El período que contiene la fecha de hoy, o el primero de la lista si ninguno la contiene. */
+/** Fecha de hoy en formato ISO 'YYYY-MM-DD', calculada en hora local (no UTC). */
+function hoyIso(): string {
+  const hoy = new Date();
+  const mes = String(hoy.getMonth() + 1).padStart(2, "0");
+  const dia = String(hoy.getDate()).padStart(2, "0");
+  return `${hoy.getFullYear()}-${mes}-${dia}`;
+}
+
+/**
+ * El período del mes en curso: el que contiene la fecha de hoy. Si ninguno la contiene, se
+ * prefiere el último período ya iniciado (el pasado más reciente) antes que uno futuro, y solo
+ * si todos son futuros se toma el más próximo a comenzar.
+ */
 export function encontrarPeriodoActual(periodos: Periodo[]): Periodo | undefined {
-  const hoyIso = new Date().toISOString().slice(0, 10);
-  return (
-    periodos.find((periodo) => periodo.fecha_inicio <= hoyIso && hoyIso <= periodo.fecha_fin) ?? periodos[0]
+  if (!periodos.length) return undefined;
+  const hoy = hoyIso();
+
+  const vigente = periodos.find((periodo) => periodo.fecha_inicio <= hoy && hoy <= periodo.fecha_fin);
+  if (vigente) return vigente;
+
+  const iniciados = periodos.filter((periodo) => periodo.fecha_inicio <= hoy);
+  if (iniciados.length) {
+    return iniciados.reduce((masReciente, periodo) =>
+      periodo.fecha_inicio > masReciente.fecha_inicio ? periodo : masReciente,
+    );
+  }
+
+  return periodos.reduce((masProximo, periodo) =>
+    periodo.fecha_inicio < masProximo.fecha_inicio ? periodo : masProximo,
   );
 }

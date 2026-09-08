@@ -3,6 +3,7 @@ import { AppShell } from "@/components/layout/AppShell";
 import { usePeriodos } from "@/features/hours/hooks";
 import { formatHours } from "@/features/hours/domain";
 import { useReportePeriodo } from "@/features/reports/hooks";
+import { encontrarPeriodoActual } from "@/utils/date";
 
 export function ReportsPage() {
   const [periodoId, setPeriodoId] = useState("");
@@ -12,7 +13,10 @@ export function ReportsPage() {
   useEffect(() => {
     if (!periodosQuery.data?.length) return;
     const stillExists = periodosQuery.data.some((periodo) => periodo.id === periodoId);
-    if (!stillExists) setPeriodoId(periodosQuery.data[0].id);
+    if (!stillExists) {
+      const actual = encontrarPeriodoActual(periodosQuery.data);
+      if (actual) setPeriodoId(actual.id);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [periodosQuery.data]);
 

@@ -14,6 +14,7 @@ import {
 import { PeriodSelector } from "@/features/hours/components/PeriodSelector";
 import { PeriodoSection } from "@/features/hours/components/PeriodoSection";
 import { ProjectsModal } from "@/features/hours/components/ProjectsModal";
+import { encontrarPeriodoActual } from "@/utils/date";
 
 export function HoursRegisterPage() {
   const navigate = useNavigate();
@@ -42,7 +43,8 @@ export function HoursRegisterPage() {
     if (!periodosQuery.data?.length) return;
     const stillExists = periodosQuery.data.some((periodo) => periodo.id === periodoId);
     if (!stillExists) {
-      setPeriodoId(periodosQuery.data[0].id);
+      const actual = encontrarPeriodoActual(periodosQuery.data);
+      if (actual) setPeriodoId(actual.id);
     }
     // Solo debe reaccionar cuando cambia el catálogo de períodos disponible.
     // eslint-disable-next-line react-hooks/exhaustive-deps
