@@ -95,42 +95,40 @@ export function SignupForm() {
       </header>
 
       <form noValidate onSubmit={handleSubmit(onSubmit)}>
-        <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="nombres" className="mb-1.5 block text-sm font-semibold text-ink">
-              Nombres
-            </label>
-            <input
-              id="nombres"
-              autoComplete="given-name"
-              placeholder="Tu nombre"
-              className="form-input"
-              aria-invalid={Boolean(errors.nombres)}
-              aria-describedby="nombres-error"
-              {...register("nombres")}
-            />
-            <p id="nombres-error" className="field-error" aria-live="polite">
-              {errors.nombres?.message}
-            </p>
-          </div>
+        <div className="mb-4">
+          <label htmlFor="nombres" className="mb-1.5 block text-sm font-semibold text-ink">
+            Nombres
+          </label>
+          <input
+            id="nombres"
+            autoComplete="given-name"
+            placeholder="Tu nombre"
+            className="form-input"
+            aria-invalid={Boolean(errors.nombres)}
+            aria-describedby="nombres-error"
+            {...register("nombres")}
+          />
+          <p id="nombres-error" className="field-error" aria-live="polite">
+            {errors.nombres?.message}
+          </p>
+        </div>
 
-          <div>
-            <label htmlFor="apellidos" className="mb-1.5 block text-sm font-semibold text-ink">
-              Apellidos
-            </label>
-            <input
-              id="apellidos"
-              autoComplete="family-name"
-              placeholder="Tu apellido"
-              className="form-input"
-              aria-invalid={Boolean(errors.apellidos)}
-              aria-describedby="apellidos-error"
-              {...register("apellidos")}
-            />
-            <p id="apellidos-error" className="field-error" aria-live="polite">
-              {errors.apellidos?.message}
-            </p>
-          </div>
+        <div className="mb-4">
+          <label htmlFor="apellidos" className="mb-1.5 block text-sm font-semibold text-ink">
+            Apellidos
+          </label>
+          <input
+            id="apellidos"
+            autoComplete="family-name"
+            placeholder="Tu apellido"
+            className="form-input"
+            aria-invalid={Boolean(errors.apellidos)}
+            aria-describedby="apellidos-error"
+            {...register("apellidos")}
+          />
+          <p id="apellidos-error" className="field-error" aria-live="polite">
+            {errors.apellidos?.message}
+          </p>
         </div>
 
         <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
