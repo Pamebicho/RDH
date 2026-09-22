@@ -23,20 +23,14 @@ const stickyFirstCol = "sticky left-0 min-w-[82px] w-[82px] bg-[#fbfcfe] text-ce
 // Solo se permite cargar horas con las flechitas del campo numérico (o las flechas del
 // teclado), no escribiendo directamente: se bloquea cualquier tecla que no sea de
 // navegación/incremento, y también pegar texto.
-const TECLAS_PERMITIDAS = new Set([
-  "ArrowUp",
-  "ArrowDown",
-  "Tab",
-  "Shift",
-  "Control",
-  "Alt",
-  "Meta",
-  "Escape",
-  "Enter",
-]);
-
 function bloquearEscritura(event: React.KeyboardEvent<HTMLInputElement>) {
-  if (!TECLAS_PERMITIDAS.has(event.key)) {
+  const key = event.key;
+  const isNumber = /^\d$/.test(key);
+  const isDecimal = key === "." || key === ",";
+  const isControl = ["Backspace", "Delete", "Tab", "Enter", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key);
+  const isModifier = event.ctrlKey || event.metaKey;
+
+  if (!isNumber && !isDecimal && !isControl && !isModifier) {
     event.preventDefault();
   }
 }
