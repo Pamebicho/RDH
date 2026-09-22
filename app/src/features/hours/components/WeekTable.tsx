@@ -41,6 +41,19 @@ function bloquearEscritura(event: React.KeyboardEvent<HTMLInputElement>) {
   }
 }
 
+function getDiaSemanIso(dateStr: string): number {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const jsWeekday = date.getDay();
+  return jsWeekday === 0 ? 7 : jsWeekday;
+}
+
+function getExpectedHours(day: DayInfo): number | null {
+  if (day.weekend || day.feriado) return null;
+  const diaIso = getDiaSemanIso(day.date);
+  return diaIso === 5 ? 6 : 8.5;
+}
+
 export function WeekTable({
   days,
   columns,
@@ -135,12 +148,21 @@ export function WeekTable({
                   ))}
 
                   <td
-                    className={cn(
-                      "border-b border-[#e1e7ef] min-w-[92px] px-3 py-2.5 text-center font-bold",
-                      dayTotal > MAX_DAILY_HOURS && "bg-[#fff1f1] text-danger",
-                    )}
+                    className={(() => {
+                      const expectedHours = getExpectedHours(day);
+                      const isExceeded = expectedHours !== null && dayTotal > expectedHours;
+                      const isOverLimit = dayTotal > MAX_DAILY_HOURS;
+                      return cn(
+                        "border-b border-[#e1e7ef] min-w-[92px] px-3 py-2.5 text-center font-bold",
+                        isOverLimit && "bg-[#fff1f1] text-danger",
+                        isExceeded && !isOverLimit && "bg-[#fff8e1] text-[#7a6000]",
+                      );
+                    })()}
                   >
-                    {formatHours(dayTotal)}
+                    <div>{formatHours(dayTotal)}</div>
+                    {getExpectedHours(day) !== null && (
+                      <div className="text-[0.75rem] text-[#666] mt-0.5">/ {formatHours(getExpectedHours(day)!)}h</div>
+                    )}
                   </td>
                 </tr>
               );
