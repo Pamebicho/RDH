@@ -2,10 +2,14 @@
 -- Registro de Horas Krontec — esquema Supabase (Postgres)
 -- Modelo completo (22 tablas) según Tablas_Modelo_Base_Datos_Registro_Horas_Krontec.docx
 --
+-- Migración inicial: contiene todo el esquema hasta este punto (antes era un solo archivo
+-- supabase/schema.sql pegado a mano en el SQL Editor). De aquí en adelante, cualquier cambio de
+-- esquema se agrega como una migración NUEVA (`supabase migration new nombre_del_cambio`), nunca
+-- editando este archivo — así queda un historial real y `supabase db push`/`db diff` funcionan.
+--
 -- Reemplaza por completo al esquema simple v1 (profiles/cost_centers/periods/...).
--- Ejecutar completo en el SQL editor del proyecto Supabase. ADVERTENCIA: al empezar
--- borra las tablas del esquema v1 y sus datos — solo correr si aceptas perder los
--- datos de prueba cargados con la versión anterior.
+-- ADVERTENCIA: al empezar borra las tablas del esquema v1 y sus datos — solo aplicar si aceptas
+-- perder los datos de prueba cargados con la versión anterior.
 -- =============================================================================
 
 -- ---------------------------------------------------------------------------
@@ -680,10 +684,11 @@ create trigger validar_dominio_before_insert
 -- fila existente (le asigna el auth_user_id) en vez de fallar por el UNIQUE de
 -- correo_corporativo. nombres/apellidos/rut/cargo_id/jefatura (enviados como raw_user_meta_data
 -- desde SignupForm.tsx) solo se completan si el trabajador no los tenía ya cargados (coalesce),
--- para no pisar los datos que un Super Admin haya ingresado a mano. Solo
--- asigna un rol por defecto si el trabajador todavía no tiene ningún rol asignado (para no pisar
--- los roles que un Super Admin ya haya elegido al pre-crearlo): adm1@krontec.cl queda como
--- SUPER_ADMIN automáticamente, cualquier otro correo @krontec.cl queda como TRABAJADOR.
+-- para no pisar los datos que un Super Admin haya ingresado a mano. Solo asigna el rol TRABAJADOR
+-- por defecto si el trabajador todavía no tiene ningún rol asignado (para no pisar los roles que
+-- un Super Admin ya haya elegido al pre-crearlo). No hay ningún correo con SUPER_ADMIN automático
+-- aquí a propósito: ese rol se asigna a mano una sola vez siguiendo la sección "Asignar el primer
+-- Super Admin" del README, para no tener dos mecanismos distintos otorgando el mismo privilegio.
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -692,7 +697,6 @@ as $$
 declare
   v_trabajador_id uuid;
   v_rol_id uuid;
-  v_codigo_rol text;
   v_tiene_roles boolean;
 begin
   insert into public.trabajadores (auth_user_id, correo_corporativo, nombres, apellidos, rut, cargo_id, jefatura)
@@ -719,8 +723,7 @@ begin
   ) into v_tiene_roles;
 
   if not v_tiene_roles then
-    v_codigo_rol := case when lower(new.email) = 'adm1@krontec.cl' then 'SUPER_ADMIN' else 'TRABAJADOR' end;
-    select id into v_rol_id from public.roles where codigo = v_codigo_rol;
+    select id into v_rol_id from public.roles where codigo = 'TRABAJADOR';
 
     if v_rol_id is not null then
       insert into public.trabajador_roles (trabajador_id, rol_id, activo)

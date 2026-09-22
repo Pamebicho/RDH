@@ -1,6 +1,6 @@
 -- =============================================================================
--- Verificación estructural de los cambios de seguridad (correr después del
--- schema.sql completo). Solo lee metadata, no modifica nada.
+-- Verificación estructural de los cambios de seguridad (correr después de aplicar las
+-- migraciones en supabase/migrations/). Solo lee metadata, no modifica nada.
 -- =============================================================================
 
 -- 1. Las funciones nuevas deben existir

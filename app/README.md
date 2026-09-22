@@ -19,7 +19,14 @@ Cierra y vuelve a abrir la terminal/VS Code después de instalar para que el `PA
 ## 1. Crear el proyecto en Supabase
 
 1. Crea una cuenta y un proyecto nuevo en [supabase.com](https://supabase.com).
-2. Ve a **SQL Editor** → pega el contenido completo de [`supabase/schema.sql`](./supabase/schema.sql) → **Run**.
+2. Aplica el esquema. El esquema vive versionado en `supabase/migrations/` (una migración por cambio,
+   nunca se edita una migración ya aplicada). Dos formas de aplicarlo:
+   - **Con Supabase CLI (recomendado):** `npx supabase link --project-ref <tu-project-ref>` y luego
+     `npx supabase db push`. Aplica todas las migraciones en orden y deja registro de cuáles ya corrieron.
+   - **A mano (sin CLI):** Ve a **SQL Editor** → pega el contenido completo de
+     [`supabase/migrations/20260921193729_initial_schema.sql`](./supabase/migrations/20260921193729_initial_schema.sql)
+     → **Run**.
+
    Esto crea las 22 tablas, las políticas de seguridad (RLS) por rol, las funciones helper, los triggers y
    el catálogo inicial (roles, tipos de registro, jornada estándar, proyectos, un período de ejemplo).
    **Advertencia:** si ya habías corrido una versión anterior del esquema, este script empieza borrando
@@ -112,10 +119,14 @@ src/
   routes/        Guards de rutas protegidas/públicas/por rol
   types/         Tipos de la base de datos de Supabase (22 tablas)
 supabase/
-  schema.sql     Esquema completo: 22 tablas, RLS por rol, funciones helper, triggers, catálogo inicial
+  migrations/    Esquema versionado (una migración por cambio): 22 tablas, RLS por rol, funciones
+                 helper, triggers, catálogo inicial
 tests/
   domain.test.ts         Tests de la lógica de cálculo de horas semanales
+  reducer.test.ts        Tests del reducer de borrador de horas (tope diario, dirty state)
   authValidation.test.ts Tests de validación del formulario de login
+  hoursApi.test.ts       Tests de la capa de datos de registro de horas
+  approvalsApi.test.ts   Tests de la capa de datos de aprobaciones
 ```
 
 ## Notas de diseño

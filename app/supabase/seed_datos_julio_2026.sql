@@ -3,7 +3,8 @@
 -- Generado a partir de Info/HH 07 2026 Ctrl Diario PCC.xlsx y
 -- Info/trabajadores krontec.xlsx — solo trabajadores de las áreas TI,
 -- Operaciones y CIK que aparecen en ambos archivos.
--- Ejecutar una sola vez en el SQL Editor de Supabase, después de schema.sql.
+-- Ejecutar una sola vez en el SQL Editor de Supabase, después de aplicar las migraciones
+-- (supabase/migrations/).
 -- =============================================================================
 
 -- --- Áreas (solo si no existen ya por nombre, sin distinguir mayúsculas; evita
