@@ -45,16 +45,8 @@ function parseHoursInput(value: string): number {
   if (!value) return 0;
   const normalized = value.replace(",", ".");
   const parsed = parseFloat(normalized);
-  return isNaN(parsed) ? 0 : Math.max(0, parsed);
-}
-
-function validarHorasInput(value: string): string {
-  if (!value) return "";
-  const normalized = value.replace(",", ".");
-  if (!/^\d*\.?\d{0,1}$/.test(normalized)) return "";
-  const parsed = parseFloat(normalized);
-  if (isNaN(parsed) || parsed > MAX_DAILY_HOURS) return String(MAX_DAILY_HOURS);
-  return normalized;
+  if (isNaN(parsed)) return 0;
+  return Math.min(Math.max(0, parsed), MAX_DAILY_HOURS);
 }
 
 function getDiaSemanIso(dateStr: string): number {
@@ -156,8 +148,7 @@ export function WeekTable({
                           disabled={inputsDisabled}
                           onFocus={() => onSetActiveDate(day.date)}
                           onChange={(event) => {
-                            const validated = validarHorasInput(event.target.value);
-                            onSetHour(day.date, columna.id, parseHoursInput(validated));
+                            onSetHour(day.date, columna.id, parseHoursInput(event.target.value));
                           }}
                           onKeyDown={bloquearEscritura}
                           onPaste={(event) => event.preventDefault()}
