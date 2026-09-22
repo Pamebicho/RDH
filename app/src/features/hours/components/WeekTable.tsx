@@ -41,6 +41,22 @@ function bloquearEscritura(event: React.KeyboardEvent<HTMLInputElement>) {
   }
 }
 
+function parseHoursInput(value: string): number {
+  if (!value) return 0;
+  const normalized = value.replace(",", ".");
+  const parsed = parseFloat(normalized);
+  return isNaN(parsed) ? 0 : Math.max(0, parsed);
+}
+
+function validarHorasInput(value: string): string {
+  if (!value) return "";
+  const normalized = value.replace(",", ".");
+  if (!/^\d*\.?\d{0,1}$/.test(normalized)) return "";
+  const parsed = parseFloat(normalized);
+  if (isNaN(parsed) || parsed > MAX_DAILY_HOURS) return String(MAX_DAILY_HOURS);
+  return normalized;
+}
+
 function getDiaSemanIso(dateStr: string): number {
   const [year, month, day] = dateStr.split("-").map(Number);
   const date = new Date(year, month - 1, day);
@@ -128,24 +144,30 @@ export function WeekTable({
                     {day.label}
                   </th>
 
-                  {columns.map((columna) => (
-                    <td key={columna.id} className="border-b border-[#e1e7ef] px-3 py-2.5">
-                      <input
-                        type="number"
-                        min={0}
-                        max={MAX_DAILY_HOURS}
-                        step={0.5}
-                        value={hours[day.date]?.[columna.id] ?? 0}
-                        disabled={inputsDisabled}
-                        onFocus={() => onSetActiveDate(day.date)}
-                        onChange={(event) => onSetHour(day.date, columna.id, Number(event.target.value || 0))}
-                        onKeyDown={bloquearEscritura}
-                        onPaste={(event) => event.preventDefault()}
-                        aria-label={`Horas del ${day.label} en ${columna.codigo} ${columna.etiqueta}`}
-                        className="form-input min-w-[92px] py-1.5 text-center"
-                      />
-                    </td>
-                  ))}
+                  {columns.map((columna) => {
+                    const currentValue = hours[day.date]?.[columna.id] ?? 0;
+                    const displayValue = currentValue === 0 ? "" : String(currentValue);
+                    return (
+                      <td key={columna.id} className="border-b border-[#e1e7ef] px-3 py-2.5">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={displayValue}
+                          disabled={inputsDisabled}
+                          onFocus={() => onSetActiveDate(day.date)}
+                          onChange={(event) => {
+                            const validated = validarHorasInput(event.target.value);
+                            onSetHour(day.date, columna.id, parseHoursInput(validated));
+                          }}
+                          onKeyDown={bloquearEscritura}
+                          onPaste={(event) => event.preventDefault()}
+                          placeholder="0"
+                          aria-label={`Horas del ${day.label} en ${columna.codigo} ${columna.etiqueta}`}
+                          className="form-input min-w-[92px] py-1.5 text-center"
+                        />
+                      </td>
+                    );
+                  })}
 
                   <td
                     className={(() => {
@@ -159,10 +181,7 @@ export function WeekTable({
                       );
                     })()}
                   >
-                    <div>{formatHours(dayTotal)}</div>
-                    {getExpectedHours(day) !== null && (
-                      <div className="text-[0.75rem] text-[#666] mt-0.5">/ {formatHours(getExpectedHours(day)!)}h</div>
-                    )}
+                    {formatHours(dayTotal)}
                   </td>
                 </tr>
               );
