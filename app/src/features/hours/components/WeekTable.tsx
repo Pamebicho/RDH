@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { cn } from "@/utils/cn";
 import type { ColumnaRegistro, DayInfo, HoursByDateAndColumn } from "../domain";
 import { MAX_DAILY_HOURS, formatHours } from "../domain";
@@ -20,9 +21,8 @@ interface WeekTableProps {
 const stickyHeadCell = "sticky top-0 bg-[#fbfcfe] border-b border-[#dfe5ee]";
 const stickyFirstCol = "sticky left-0 min-w-[82px] w-[82px] bg-[#fbfcfe] text-center";
 
-// Solo se permite cargar horas con las flechitas del campo numérico (o las flechas del
-// teclado), no escribiendo directamente: se bloquea cualquier tecla que no sea de
-// navegación/incremento, y también pegar texto.
+// No se permite escribir letras ni símbolos: solo dígitos, coma/punto decimal y teclas de
+// edición/navegación. No se permite pegar texto (para no saltarse la validación de formato).
 function bloquearEscritura(event: React.KeyboardEvent<HTMLInputElement>) {
   const key = event.key;
   const isNumber = /^\d$/.test(key);
@@ -35,12 +35,71 @@ function bloquearEscritura(event: React.KeyboardEvent<HTMLInputElement>) {
   }
 }
 
+// Mientras se escribe se acepta hasta 2 dígitos enteros y un solo dígito decimal
+// (con coma o punto): "", "1", "1,", "1,5", "24".
+const PATRON_HORAS_PARCIAL = /^\d{0,2}([.,]\d{0,1})?$/;
+
 function parseHoursInput(value: string): number {
   if (!value) return 0;
   const normalized = value.replace(",", ".");
   const parsed = parseFloat(normalized);
   if (isNaN(parsed)) return 0;
   return Math.min(Math.max(0, parsed), MAX_DAILY_HOURS);
+}
+
+/** Formatea con coma decimal para mostrar, o "" si el valor es 0 (celda vacía). */
+function formatHoursForDisplay(value: number): string {
+  return value === 0 ? "" : formatHours(value);
+}
+
+interface HourInputProps {
+  value: number;
+  disabled: boolean;
+  ariaLabel: string;
+  onFocusInput: () => void;
+  onChangeValue: (value: number) => void;
+}
+
+/**
+ * Input controlado con estado de texto propio: mientras el usuario escribe (p. ej. "1,")
+ * se muestra tal cual, sin redondear a número en cada tecla (eso borraría la coma recién
+ * tecleada). Solo se normaliza el texto mostrado al perder el foco.
+ */
+function HourInput({ value, disabled, ariaLabel, onFocusInput, onChangeValue }: HourInputProps) {
+  const [texto, setTexto] = useState(() => formatHoursForDisplay(value));
+  const [enFoco, setEnFoco] = useState(false);
+
+  useEffect(() => {
+    if (!enFoco) setTexto(formatHoursForDisplay(value));
+  }, [value, enFoco]);
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      value={texto}
+      disabled={disabled}
+      onFocus={() => {
+        setEnFoco(true);
+        onFocusInput();
+      }}
+      onBlur={() => {
+        setEnFoco(false);
+        setTexto(formatHoursForDisplay(value));
+      }}
+      onChange={(event) => {
+        const raw = event.target.value;
+        if (!PATRON_HORAS_PARCIAL.test(raw)) return;
+        setTexto(raw);
+        onChangeValue(parseHoursInput(raw));
+      }}
+      onKeyDown={bloquearEscritura}
+      onPaste={(event) => event.preventDefault()}
+      placeholder="0"
+      aria-label={ariaLabel}
+      className="form-input min-w-[92px] py-1.5 text-center"
+    />
+  );
 }
 
 function getDiaSemanIso(dateStr: string): number {
@@ -130,29 +189,17 @@ export function WeekTable({
                     {day.label}
                   </th>
 
-                  {columns.map((columna) => {
-                    const currentValue = hours[day.date]?.[columna.id] ?? 0;
-                    const displayValue = currentValue === 0 ? "" : String(currentValue);
-                    return (
-                      <td key={columna.id} className="border-b border-[#e1e7ef] px-3 py-2.5">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={displayValue}
-                          disabled={inputsDisabled}
-                          onFocus={() => onSetActiveDate(day.date)}
-                          onChange={(event) => {
-                            onSetHour(day.date, columna.id, parseHoursInput(event.target.value));
-                          }}
-                          onKeyDown={bloquearEscritura}
-                          onPaste={(event) => event.preventDefault()}
-                          placeholder="0"
-                          aria-label={`Horas del ${day.label} en ${columna.codigo} ${columna.etiqueta}`}
-                          className="form-input min-w-[92px] py-1.5 text-center"
-                        />
-                      </td>
-                    );
-                  })}
+                  {columns.map((columna) => (
+                    <td key={columna.id} className="border-b border-[#e1e7ef] px-3 py-2.5">
+                      <HourInput
+                        value={hours[day.date]?.[columna.id] ?? 0}
+                        disabled={inputsDisabled}
+                        ariaLabel={`Horas del ${day.label} en ${columna.codigo} ${columna.etiqueta}`}
+                        onFocusInput={() => onSetActiveDate(day.date)}
+                        onChangeValue={(value) => onSetHour(day.date, columna.id, value)}
+                      />
+                    </td>
+                  ))}
 
                   <td
                     className={(() => {
