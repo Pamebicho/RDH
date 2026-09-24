@@ -2,10 +2,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { AuthContext } from "./AuthContext";
+import { useInactivityLogout } from "./useInactivityLogout";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useInactivityLogout(Boolean(session));
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
