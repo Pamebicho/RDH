@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Button } from "@/components/ui/Button";
 import { CORPORATE_DOMAIN } from "@/config/env";
 import { useCargos, useJefaturas } from "@/features/admin/hooks";
+import { toTitleCase } from "@/utils/text";
 import { signupSchema, type SignupFormValues } from "./authValidation";
 
 type StatusTone = "success" | "danger" | "info";
@@ -32,6 +33,7 @@ export function SignupForm() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -55,8 +57,8 @@ export function SignupForm() {
       password: values.password,
       options: {
         data: {
-          nombres: values.nombres,
-          apellidos: values.apellidos,
+          nombres: toTitleCase(values.nombres),
+          apellidos: toTitleCase(values.apellidos),
           rut: values.rut,
           cargo_id: values.cargoId || null,
           jefatura: values.jefatura,
@@ -106,7 +108,9 @@ export function SignupForm() {
             className="form-input"
             aria-invalid={Boolean(errors.nombres)}
             aria-describedby="nombres-error"
-            {...register("nombres")}
+            {...register("nombres", {
+              onBlur: (event) => setValue("nombres", toTitleCase(event.target.value), { shouldValidate: true }),
+            })}
           />
           <p id="nombres-error" className="field-error" aria-live="polite">
             {errors.nombres?.message}
@@ -124,7 +128,9 @@ export function SignupForm() {
             className="form-input"
             aria-invalid={Boolean(errors.apellidos)}
             aria-describedby="apellidos-error"
-            {...register("apellidos")}
+            {...register("apellidos", {
+              onBlur: (event) => setValue("apellidos", toTitleCase(event.target.value), { shouldValidate: true }),
+            })}
           />
           <p id="apellidos-error" className="field-error" aria-live="polite">
             {errors.apellidos?.message}
@@ -211,6 +217,9 @@ export function SignupForm() {
           <label htmlFor="password" className="mb-1.5 block text-sm font-semibold text-ink">
             Contraseña
           </label>
+          <p className="mb-1.5 text-xs text-ink-muted">
+            Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número.
+          </p>
           <div className="relative">
             <Lock
               className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"

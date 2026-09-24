@@ -95,6 +95,9 @@ export function ResetPasswordForm() {
           <label htmlFor="password" className="mb-1.5 block text-sm font-semibold text-ink">
             Nueva contraseña
           </label>
+          <p className="mb-1.5 text-xs text-ink-muted">
+            Mínimo 8 caracteres, con al menos una mayúscula, una minúscula y un número.
+          </p>
           <div className="relative">
             <Lock
               className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
