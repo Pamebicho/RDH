@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 import { queryClient } from "@/lib/queryClient";
 import { AuthProvider } from "@/features/auth/AuthProvider";
 import { WorkforceProvider } from "@/features/workforce/WorkforceProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { App } from "./App";
 import "@fontsource/open-sans/latin-400.css";
 import "@fontsource/open-sans/latin-500.css";
@@ -21,15 +22,17 @@ import "@/styles/index.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <WorkforceProvider>
-          <BrowserRouter>
-            <App />
-          </BrowserRouter>
-          <Toaster richColors position="top-right" />
-        </WorkforceProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <WorkforceProvider>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+            <Toaster richColors position="top-right" />
+          </WorkforceProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

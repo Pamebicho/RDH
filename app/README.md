@@ -104,7 +104,8 @@ lo que su fila en `lector_alcances` autoriza, aunque intente acceder directament
 
 ```
 src/
-  components/    UI compartida (Button, Modal, StatusBadge) y layout (AppShell, Header, Sidebar)
+  components/    UI compartida (Button, Modal, StatusBadge, ErrorBoundary) y layout (AppShell,
+                 Header, Sidebar)
   config/        Configuración de entorno (dominio corporativo)
   features/
     auth/        Login, validación (zod), contexto de sesión de Supabase
@@ -118,15 +119,19 @@ src/
   pages/         Páginas de nivel de ruta
   routes/        Guards de rutas protegidas/públicas/por rol
   types/         Tipos de la base de datos de Supabase (22 tablas)
+  utils/         Helpers puros (fechas, formateo de texto/nombres, iniciales, cn)
 supabase/
   migrations/    Esquema versionado (una migración por cambio): 22 tablas, RLS por rol, funciones
                  helper, triggers, catálogo inicial
 tests/
   domain.test.ts         Tests de la lógica de cálculo de horas semanales
   reducer.test.ts        Tests del reducer de borrador de horas (tope diario, dirty state)
-  authValidation.test.ts Tests de validación del formulario de login
+  authValidation.test.ts Tests de validación de login/registro (incluye política de contraseña)
+  text.test.ts           Tests del formateo de nombres a formato título
   hoursApi.test.ts       Tests de la capa de datos de registro de horas
   approvalsApi.test.ts   Tests de la capa de datos de aprobaciones
+  RoleRoute.test.tsx     Tests del guard de rutas por rol
+  ErrorBoundary.test.tsx Tests del manejo de errores no controlados
 ```
 
 ## Notas de diseño
