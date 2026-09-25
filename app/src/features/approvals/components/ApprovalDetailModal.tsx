@@ -4,15 +4,28 @@ import { Button } from "@/components/ui/Button";
 import { WeekTable } from "@/features/hours/components/WeekTable";
 import { formatHours } from "@/features/hours/domain";
 import { formatDateCl } from "@/utils/date";
-import { usePeriodoDetalle, useAprobarPeriodo, useDevolverPeriodo, type PeriodoPendiente } from "../hooks";
+import { usePeriodoDetalle, useAprobarPeriodo, useDevolverPeriodo } from "../hooks";
 
-interface ApprovalDetailModalProps {
-  periodo: PeriodoPendiente | null;
-  administradorId: string | undefined;
-  onClose: () => void;
+interface PeriodoBase {
+  trabajadorNombre: string;
+  periodoNombre: string;
+  periodoFechaInicio: string;
+  periodoFechaFin: string;
+  planillaIds: string[];
+  totalOrdinarias: number;
+  totalExtraordinarias: number;
+  totalAusencias: number;
 }
 
-export function ApprovalDetailModal({ periodo, administradorId, onClose }: ApprovalDetailModalProps) {
+interface ApprovalDetailModalProps {
+  periodo: PeriodoBase | null;
+  administradorId: string | undefined;
+  onClose: () => void;
+  /** true para "en progreso" (BORRADOR/DEVUELTA): solo lectura, sin aprobar/devolver. */
+  readOnly?: boolean;
+}
+
+export function ApprovalDetailModal({ periodo, administradorId, onClose, readOnly = false }: ApprovalDetailModalProps) {
   const [comentario, setComentario] = useState("");
 
   const detalle = usePeriodoDetalle(
@@ -46,17 +59,23 @@ export function ApprovalDetailModal({ periodo, administradorId, onClose }: Appro
       description={`${formatDateCl(periodo.periodoFechaInicio)} – ${formatDateCl(periodo.periodoFechaFin)}`}
       size="lg"
       footer={
-        <>
+        readOnly ? (
           <button type="button" onClick={onClose} className="btn-outline">
             Cerrar
           </button>
-          <Button type="button" variant="outline" onClick={handleDevolver} isLoading={devolver.isPending}>
-            Devolver
-          </Button>
-          <Button type="button" onClick={handleAprobar} isLoading={aprobar.isPending}>
-            Aprobar
-          </Button>
-        </>
+        ) : (
+          <>
+            <button type="button" onClick={onClose} className="btn-outline">
+              Cerrar
+            </button>
+            <Button type="button" variant="outline" onClick={handleDevolver} isLoading={devolver.isPending}>
+              Devolver
+            </Button>
+            <Button type="button" onClick={handleAprobar} isLoading={aprobar.isPending}>
+              Aprobar
+            </Button>
+          </>
+        )
       }
     >
       {detalle.isLoading ? (
@@ -91,19 +110,21 @@ export function ApprovalDetailModal({ periodo, administradorId, onClose }: Appro
             </div>
           </div>
 
-          <div>
-            <label htmlFor="comentario-devolucion" className="mb-1.5 block text-sm font-semibold text-ink">
-              Comentario (obligatorio para devolver)
-            </label>
-            <textarea
-              id="comentario-devolucion"
-              value={comentario}
-              onChange={(event) => setComentario(event.target.value)}
-              rows={3}
-              placeholder="Motivo de la devolución…"
-              className="form-input"
-            />
-          </div>
+          {readOnly ? null : (
+            <div>
+              <label htmlFor="comentario-devolucion" className="mb-1.5 block text-sm font-semibold text-ink">
+                Comentario (obligatorio para devolver)
+              </label>
+              <textarea
+                id="comentario-devolucion"
+                value={comentario}
+                onChange={(event) => setComentario(event.target.value)}
+                rows={3}
+                placeholder="Motivo de la devolución…"
+                className="form-input"
+              />
+            </div>
+          )}
 
           {detalle.historial.length > 0 ? (
             <div>

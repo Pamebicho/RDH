@@ -2,13 +2,15 @@ import { vi } from "vitest";
 
 export interface RecordedCall {
   table: string;
-  op: "select" | "upsert" | "insert" | "update" | "delete" | "eq" | "is" | "order" | "single";
+  op: "select" | "upsert" | "insert" | "update" | "delete" | "eq" | "in" | "is" | "order" | "single";
   args: unknown[];
 }
 
 export interface SupabaseMockOptions {
   /** Error a devolver para llamadas a esta tabla (todas las operaciones), si se define. */
   errorsByTable?: Record<string, { message: string }>;
+  /** Data a devolver en el `select` final de esta tabla (por defecto null). */
+  dataByTable?: Record<string, unknown>;
 }
 
 /**
@@ -21,6 +23,7 @@ export function createSupabaseMock(options: SupabaseMockOptions = {}) {
 
   function builder(table: string) {
     const error = options.errorsByTable?.[table] ?? null;
+    const data = options.dataByTable?.[table] ?? null;
     const record = (op: RecordedCall["op"], args: unknown[]) => calls.push({ table, op, args });
 
     const chain: Record<string, unknown> = {
@@ -48,6 +51,10 @@ export function createSupabaseMock(options: SupabaseMockOptions = {}) {
         record("eq", args);
         return chain;
       }),
+      in: vi.fn((...args: unknown[]) => {
+        record("in", args);
+        return chain;
+      }),
       is: vi.fn((...args: unknown[]) => {
         record("is", args);
         return chain;
@@ -60,7 +67,7 @@ export function createSupabaseMock(options: SupabaseMockOptions = {}) {
         record("single", args);
         return Promise.resolve({ data: {}, error });
       }),
-      then: (resolve: (v: unknown) => unknown) => resolve({ data: null, error }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ data, error }),
     };
 
     return chain;

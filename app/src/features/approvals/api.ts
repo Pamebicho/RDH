@@ -13,6 +13,23 @@ export async function fetchPlanillasEnviadas(): Promise<PlanillaSemanal[]> {
   return data ?? [];
 }
 
+/**
+ * Planillas BORRADOR/DEVUELTA visibles para el administrador actual (RLS ya limita a sus
+ * proyectos): trabajo que un trabajador va guardando día a día pero todavía no ha enviado, o
+ * que devolvieron para corrección y está reeditando. Sin acción de aprobar/devolver posible
+ * sobre estas — solo para verlas en progreso.
+ */
+export async function fetchPlanillasEnCurso(): Promise<PlanillaSemanal[]> {
+  const { data, error } = await supabase
+    .from("planillas_semanales")
+    .select("*")
+    .in("estado", ["BORRADOR", "DEVUELTA"])
+    .order("actualizado_en", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function fetchTrabajadoresPorIds(ids: string[]): Promise<Trabajador[]> {
   if (!ids.length) return [];
   const { data, error } = await supabase.from("trabajadores").select("*").in("id", ids);

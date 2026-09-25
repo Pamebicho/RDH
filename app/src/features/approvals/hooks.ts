@@ -11,15 +11,92 @@ import {
   type ColumnaRegistro,
   type HoursByDateAndColumn,
 } from "@/features/hours/domain";
-import type { RegistroHoras } from "@/types/database.types";
+import type { PlanillaEstado, PlanillaSemanal, RegistroHoras, Periodo, Trabajador } from "@/types/database.types";
 import {
   aprobarPlanilla,
   devolverPlanilla,
   fetchHistorialAprobacionesMultiple,
   fetchPeriodosPorIds,
+  fetchPlanillasEnCurso,
   fetchPlanillasEnviadas,
   fetchTrabajadoresPorIds,
 } from "./api";
+
+interface PeriodoAgrupadoBase {
+  trabajadorId: string;
+  trabajadorNombre: string;
+  periodoId: string;
+  periodoNombre: string;
+  periodoFechaInicio: string;
+  periodoFechaFin: string;
+  planillaIds: string[];
+  totalOrdinarias: number;
+  totalExtraordinarias: number;
+  totalAusencias: number;
+  /** Estados distintos entre las semanas agrupadas (una planilla por semana). */
+  estados: PlanillaEstado[];
+  /** Fecha de referencia según `campoFecha`/`comparacion` pasados a la función. */
+  fechaReferencia: string | null;
+}
+
+/**
+ * Agrupa planillas semanales por trabajador+período en un solo registro por período (varias
+ * semanas = un período). Se reutiliza tanto para "pendientes de aprobar" (ENVIADA, fecha mínima
+ * de envío) como para "en progreso" (BORRADOR/DEVUELTA, fecha máxima de última edición).
+ */
+function agruparPlanillasPorTrabajadorYPeriodo(
+  planillas: PlanillaSemanal[],
+  trabajadorPorId: Map<string, Trabajador>,
+  periodoPorId: Map<string, Periodo>,
+  opciones: { campoFecha: "enviada_en" | "actualizado_en"; comparacion: "min" | "max" },
+): PeriodoAgrupadoBase[] {
+  const grupos = new Map<string, PeriodoAgrupadoBase>();
+
+  for (const planilla of planillas) {
+    const clave = `${planilla.trabajador_id}|${planilla.periodo_id}`;
+    const fechaPlanilla = planilla[opciones.campoFecha];
+    const existente = grupos.get(clave);
+
+    if (!existente) {
+      const trabajador = trabajadorPorId.get(planilla.trabajador_id);
+      const periodo = periodoPorId.get(planilla.periodo_id);
+      const nombre = [trabajador?.nombres, trabajador?.apellidos].filter(Boolean).join(" ");
+
+      grupos.set(clave, {
+        trabajadorId: planilla.trabajador_id,
+        trabajadorNombre: nombre || trabajador?.correo_corporativo || "Trabajador",
+        periodoId: planilla.periodo_id,
+        periodoNombre: periodo?.nombre ?? "",
+        periodoFechaInicio: periodo?.fecha_inicio ?? "",
+        periodoFechaFin: periodo?.fecha_fin ?? "",
+        planillaIds: [planilla.id],
+        totalOrdinarias: Number(planilla.total_ordinarias),
+        totalExtraordinarias: Number(planilla.total_extraordinarias),
+        totalAusencias: Number(planilla.total_ausencias),
+        estados: [planilla.estado],
+        fechaReferencia: fechaPlanilla,
+      });
+      continue;
+    }
+
+    existente.planillaIds.push(planilla.id);
+    existente.totalOrdinarias += Number(planilla.total_ordinarias);
+    existente.totalExtraordinarias += Number(planilla.total_extraordinarias);
+    existente.totalAusencias += Number(planilla.total_ausencias);
+    if (!existente.estados.includes(planilla.estado)) existente.estados.push(planilla.estado);
+
+    if (fechaPlanilla) {
+      const esMasRelevante =
+        !existente.fechaReferencia ||
+        (opciones.comparacion === "min"
+          ? fechaPlanilla < existente.fechaReferencia
+          : fechaPlanilla > existente.fechaReferencia);
+      if (esMasRelevante) existente.fechaReferencia = fechaPlanilla;
+    }
+  }
+
+  return [...grupos.values()].sort((a, b) => a.trabajadorNombre.localeCompare(b.trabajadorNombre, "es"));
+}
 
 export interface PeriodoPendiente {
   trabajadorId: string;
@@ -63,43 +140,82 @@ export function usePeriodosPendientes() {
   const periodos: PeriodoPendiente[] = useMemo(() => {
     const trabajadorPorId = new Map((trabajadoresQuery.data ?? []).map((t) => [t.id, t]));
     const periodoPorId = new Map((periodosQuery.data ?? []).map((p) => [p.id, p]));
-    const grupos = new Map<string, PeriodoPendiente>();
+    const grupos = agruparPlanillasPorTrabajadorYPeriodo(planillasQuery.data ?? [], trabajadorPorId, periodoPorId, {
+      campoFecha: "enviada_en",
+      comparacion: "min",
+    });
 
-    for (const planilla of planillasQuery.data ?? []) {
-      const clave = `${planilla.trabajador_id}|${planilla.periodo_id}`;
-      const existente = grupos.get(clave);
+    return grupos.map(({ estados: _estados, fechaReferencia, ...resto }) => ({
+      ...resto,
+      enviadaEn: fechaReferencia,
+    }));
+  }, [planillasQuery.data, trabajadoresQuery.data, periodosQuery.data]);
 
-      if (!existente) {
-        const trabajador = trabajadorPorId.get(planilla.trabajador_id);
-        const periodo = periodoPorId.get(planilla.periodo_id);
-        const nombre = [trabajador?.nombres, trabajador?.apellidos].filter(Boolean).join(" ");
+  return {
+    periodos,
+    isLoading:
+      planillasQuery.isLoading || trabajadoresQuery.isFetching || periodosQuery.isFetching,
+  };
+}
 
-        grupos.set(clave, {
-          trabajadorId: planilla.trabajador_id,
-          trabajadorNombre: nombre || trabajador?.correo_corporativo || "Trabajador",
-          periodoId: planilla.periodo_id,
-          periodoNombre: periodo?.nombre ?? "",
-          periodoFechaInicio: periodo?.fecha_inicio ?? "",
-          periodoFechaFin: periodo?.fecha_fin ?? "",
-          planillaIds: [planilla.id],
-          totalOrdinarias: Number(planilla.total_ordinarias),
-          totalExtraordinarias: Number(planilla.total_extraordinarias),
-          totalAusencias: Number(planilla.total_ausencias),
-          enviadaEn: planilla.enviada_en,
-        });
-        continue;
-      }
+export interface PeriodoEnCurso {
+  trabajadorId: string;
+  trabajadorNombre: string;
+  periodoId: string;
+  periodoNombre: string;
+  periodoFechaInicio: string;
+  periodoFechaFin: string;
+  planillaIds: string[];
+  totalOrdinarias: number;
+  totalExtraordinarias: number;
+  totalAusencias: number;
+  actualizadoEn: string | null;
+  /** true si alguna semana del período está DEVUELTA (se está corrigiendo), no solo BORRADOR nueva. */
+  enCorreccion: boolean;
+}
 
-      existente.planillaIds.push(planilla.id);
-      existente.totalOrdinarias += Number(planilla.total_ordinarias);
-      existente.totalExtraordinarias += Number(planilla.total_extraordinarias);
-      existente.totalAusencias += Number(planilla.total_ausencias);
-      if (planilla.enviada_en && (!existente.enviadaEn || planilla.enviada_en < existente.enviadaEn)) {
-        existente.enviadaEn = planilla.enviada_en;
-      }
-    }
+/**
+ * Agrupa por trabajador+período las planillas BORRADOR/DEVUELTA: trabajo en progreso que aún no
+ * se ha enviado (o que se devolvió y se está reeditando), para que un administrador pueda verlo
+ * en modo lectura antes del envío definitivo.
+ */
+export function usePeriodosEnCurso() {
+  const planillasQuery = useQuery({ queryKey: ["planillas-en-curso"], queryFn: fetchPlanillasEnCurso });
 
-    return [...grupos.values()].sort((a, b) => a.trabajadorNombre.localeCompare(b.trabajadorNombre, "es"));
+  const trabajadorIds = useMemo(
+    () => [...new Set((planillasQuery.data ?? []).map((planilla) => planilla.trabajador_id))],
+    [planillasQuery.data],
+  );
+  const periodoIds = useMemo(
+    () => [...new Set((planillasQuery.data ?? []).map((planilla) => planilla.periodo_id))],
+    [planillasQuery.data],
+  );
+
+  const trabajadoresQuery = useQuery({
+    queryKey: ["trabajadores-por-ids", trabajadorIds],
+    queryFn: () => fetchTrabajadoresPorIds(trabajadorIds),
+    enabled: trabajadorIds.length > 0,
+  });
+
+  const periodosQuery = useQuery({
+    queryKey: ["periodos-por-ids", periodoIds],
+    queryFn: () => fetchPeriodosPorIds(periodoIds),
+    enabled: periodoIds.length > 0,
+  });
+
+  const periodos: PeriodoEnCurso[] = useMemo(() => {
+    const trabajadorPorId = new Map((trabajadoresQuery.data ?? []).map((t) => [t.id, t]));
+    const periodoPorId = new Map((periodosQuery.data ?? []).map((p) => [p.id, p]));
+    const grupos = agruparPlanillasPorTrabajadorYPeriodo(planillasQuery.data ?? [], trabajadorPorId, periodoPorId, {
+      campoFecha: "actualizado_en",
+      comparacion: "max",
+    });
+
+    return grupos.map(({ estados, fechaReferencia, ...resto }) => ({
+      ...resto,
+      actualizadoEn: fechaReferencia,
+      enCorreccion: estados.includes("DEVUELTA"),
+    }));
   }, [planillasQuery.data, trabajadoresQuery.data, periodosQuery.data]);
 
   return {

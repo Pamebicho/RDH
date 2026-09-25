@@ -9,10 +9,32 @@ vi.mock("@/lib/supabaseClient", () => ({
   },
 }));
 
-import { aprobarPlanilla, devolverPlanilla } from "@/features/approvals/api";
+import { aprobarPlanilla, devolverPlanilla, fetchPlanillasEnCurso } from "@/features/approvals/api";
 
 beforeEach(() => {
   mock.instance = createSupabaseMock();
+});
+
+describe("fetchPlanillasEnCurso", () => {
+  it("filtra por estado BORRADOR/DEVUELTA ordenando por última actualización", async () => {
+    const filas = [{ id: "planilla-1", estado: "BORRADOR" }];
+    mock.instance = createSupabaseMock({ dataByTable: { planillas_semanales: filas } });
+
+    const resultado = await fetchPlanillasEnCurso();
+
+    expect(resultado).toEqual(filas);
+
+    const inCall = mock.instance.calls.find((c) => c.table === "planillas_semanales" && c.op === "in");
+    expect(inCall?.args).toEqual(["estado", ["BORRADOR", "DEVUELTA"]]);
+
+    const orderCall = mock.instance.calls.find((c) => c.table === "planillas_semanales" && c.op === "order");
+    expect(orderCall?.args).toEqual(["actualizado_en", { ascending: false }]);
+  });
+
+  it("propaga el error si Supabase lo rechaza", async () => {
+    mock.instance = createSupabaseMock({ errorsByTable: { planillas_semanales: { message: "denegado" } } });
+    await expect(fetchPlanillasEnCurso()).rejects.toEqual({ message: "denegado" });
+  });
 });
 
 describe("aprobarPlanilla", () => {
