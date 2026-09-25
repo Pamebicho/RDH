@@ -28,6 +28,7 @@ export function SignupForm() {
   const cargosQuery = useCargos();
   const jefaturasQuery = useJefaturas();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [status, setStatus] = useState<StatusMessage | null>(null);
 
   const {
@@ -261,7 +262,7 @@ export function SignupForm() {
             />
             <input
               id="confirmPassword"
-              type={showPassword ? "text" : "password"}
+              type={showConfirmPassword ? "text" : "password"}
               autoComplete="new-password"
               placeholder="Repite tu contraseña"
               className="form-input pl-10 pr-11"
@@ -271,12 +272,12 @@ export function SignupForm() {
             />
             <button
               type="button"
-              onClick={() => setShowPassword((value) => !value)}
-              aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-              aria-pressed={showPassword}
+              onClick={() => setShowConfirmPassword((value) => !value)}
+              aria-label={showConfirmPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+              aria-pressed={showConfirmPassword}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted transition-colors hover:text-krontec-blue"
             >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
             </button>
           </div>
           <p id="confirmPassword-error" className="field-error" aria-live="polite">
