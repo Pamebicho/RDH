@@ -104,7 +104,7 @@ export function SignupForm() {
           <input
             id="nombres"
             autoComplete="given-name"
-            placeholder="Tu nombre"
+            placeholder="Tus nombres"
             className="form-input"
             aria-invalid={Boolean(errors.nombres)}
             aria-describedby="nombres-error"
@@ -124,7 +124,7 @@ export function SignupForm() {
           <input
             id="apellidos"
             autoComplete="family-name"
-            placeholder="Tu apellido"
+            placeholder="Tus apellidos"
             className="form-input"
             aria-invalid={Boolean(errors.apellidos)}
             aria-describedby="apellidos-error"

@@ -43,8 +43,8 @@ export type ResetPasswordFormValues = z.infer<typeof resetPasswordSchema>;
 
 export const signupSchema = z
   .object({
-    nombres: z.string().trim().min(1, "Debes ingresar tu nombre."),
-    apellidos: z.string().trim().min(1, "Debes ingresar tu apellido."),
+    nombres: z.string().trim().min(1, "Debes ingresar tus nombres."),
+    apellidos: z.string().trim().min(1, "Debes ingresar tus apellidos."),
     rut: z.string().trim().min(1, "Debes ingresar tu RUT."),
     cargoId: z.string(),
     jefatura: z.string().trim(),
