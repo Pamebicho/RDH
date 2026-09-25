@@ -19,12 +19,14 @@ export async function fetchPlanillasEnviadas(): Promise<PlanillaSemanal[]> {
  * que devolvieron para corrección y está reeditando. Sin acción de aprobar/devolver posible
  * sobre estas — solo para verlas en progreso.
  */
-export async function fetchPlanillasEnCurso(): Promise<PlanillaSemanal[]> {
-  const { data, error } = await supabase
-    .from("planillas_semanales")
-    .select("*")
-    .in("estado", ["BORRADOR", "DEVUELTA"])
-    .order("actualizado_en", { ascending: false });
+export async function fetchPlanillasEnCurso(periodoId?: string): Promise<PlanillaSemanal[]> {
+  let query = supabase.from("planillas_semanales").select("*").in("estado", ["BORRADOR", "DEVUELTA"]);
+
+  if (periodoId) {
+    query = query.eq("periodo_id", periodoId);
+  }
+
+  const { data, error } = await query.order("actualizado_en", { ascending: false });
 
   if (error) throw error;
   return data ?? [];

@@ -179,8 +179,11 @@ export interface PeriodoEnCurso {
  * se ha enviado (o que se devolvió y se está reeditando), para que un administrador pueda verlo
  * en modo lectura antes del envío definitivo.
  */
-export function usePeriodosEnCurso() {
-  const planillasQuery = useQuery({ queryKey: ["planillas-en-curso"], queryFn: fetchPlanillasEnCurso });
+export function usePeriodosEnCurso(periodoId?: string) {
+  const planillasQuery = useQuery({
+    queryKey: ["planillas-en-curso", periodoId ?? null],
+    queryFn: () => fetchPlanillasEnCurso(periodoId),
+  });
 
   const trabajadorIds = useMemo(
     () => [...new Set((planillasQuery.data ?? []).map((planilla) => planilla.trabajador_id))],

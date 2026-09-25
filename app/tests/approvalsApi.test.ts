@@ -29,6 +29,15 @@ describe("fetchPlanillasEnCurso", () => {
 
     const orderCall = mock.instance.calls.find((c) => c.table === "planillas_semanales" && c.op === "order");
     expect(orderCall?.args).toEqual(["actualizado_en", { ascending: false }]);
+
+    expect(mock.instance.calls.find((c) => c.op === "eq")).toBeUndefined();
+  });
+
+  it("filtra además por período cuando se indica un periodoId", async () => {
+    await fetchPlanillasEnCurso("periodo-1");
+
+    const eqCall = mock.instance.calls.find((c) => c.table === "planillas_semanales" && c.op === "eq");
+    expect(eqCall?.args).toEqual(["periodo_id", "periodo-1"]);
   });
 
   it("propaga el error si Supabase lo rechaza", async () => {
