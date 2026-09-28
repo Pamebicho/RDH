@@ -36,6 +36,20 @@ export async function fetchPlanillasPendientesCount(): Promise<number> {
   return new Set((data ?? []).map((row) => `${row.trabajador_id}|${row.periodo_id}`)).size;
 }
 
+/**
+ * Cuenta períodos con trabajo en progreso (BORRADOR o DEVUELTA), no filas de planillas_semanales:
+ * mismo criterio de deduplicación que fetchPlanillasPendientesCount.
+ */
+export async function fetchPlanillasEnCursoCount(): Promise<number> {
+  const { data, error } = await supabase
+    .from("planillas_semanales")
+    .select("trabajador_id, periodo_id")
+    .in("estado", ["BORRADOR", "DEVUELTA"]);
+
+  if (error) throw error;
+  return new Set((data ?? []).map((row) => `${row.trabajador_id}|${row.periodo_id}`)).size;
+}
+
 export async function fetchPlanillasDelPeriodo(periodoId: string): Promise<PlanillaSemanal[]> {
   const { data, error } = await supabase.from("planillas_semanales").select("*").eq("periodo_id", periodoId);
   if (error) throw error;

@@ -322,6 +322,9 @@ export function useAprobarPeriodo(administradorId: string | undefined) {
     onSuccess: () => {
       toast.success("Período aprobado.");
       void queryClient.invalidateQueries({ queryKey: ["planillas-enviadas"] });
+      void queryClient.invalidateQueries({ queryKey: ["resumen-planillas-pendientes"] });
+      void queryClient.invalidateQueries({ queryKey: ["resumen-planillas-en-progreso"] });
+      void queryClient.invalidateQueries({ queryKey: ["planillas-en-curso"] });
     },
     onError: () => toast.error("No fue posible aprobar el período."),
   });
@@ -339,6 +342,9 @@ export function useDevolverPeriodo(administradorId: string | undefined) {
     onSuccess: () => {
       toast.success("Período devuelto al trabajador.");
       void queryClient.invalidateQueries({ queryKey: ["planillas-enviadas"] });
+      void queryClient.invalidateQueries({ queryKey: ["resumen-planillas-pendientes"] });
+      void queryClient.invalidateQueries({ queryKey: ["resumen-planillas-en-progreso"] });
+      void queryClient.invalidateQueries({ queryKey: ["planillas-en-curso"] });
     },
     onError: () => toast.error("No fue posible devolver el período."),
   });

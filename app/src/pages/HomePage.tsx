@@ -274,12 +274,18 @@ function SuperAdminDashboard() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard icon={Users} label="Trabajadores activos" value={resumen.trabajadoresActivos} isLoading={resumen.isLoading} />
         <StatCard
           icon={CheckCircle2}
           label="Planillas pendientes de aprobación"
           value={resumen.planillasPendientes}
+          isLoading={resumen.isLoading}
+        />
+        <StatCard
+          icon={Clock}
+          label="Planillas en progreso"
+          value={resumen.planillasEnProgreso}
           isLoading={resumen.isLoading}
         />
         <StatCard icon={Grid3x3} label="Centros de costo activos" value={resumen.centrosCostoActivos} isLoading={resumen.isLoading} />

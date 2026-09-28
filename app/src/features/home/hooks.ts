@@ -7,6 +7,7 @@ import type { Periodo } from "@/types/database.types";
 import {
   fetchCentrosCostoActivosCount,
   fetchPlanillasDelPeriodo,
+  fetchPlanillasEnCursoCount,
   fetchPlanillasPendientesCount,
   fetchRegistrosPorPlanillas,
   fetchTrabajadoresActivosCount,
@@ -187,11 +188,20 @@ export function useResumenSuperAdmin() {
     queryKey: ["resumen-planillas-pendientes"],
     queryFn: fetchPlanillasPendientesCount,
   });
+  const enProgresoQuery = useQuery({
+    queryKey: ["resumen-planillas-en-progreso"],
+    queryFn: fetchPlanillasEnCursoCount,
+  });
 
   return {
     trabajadoresActivos: trabajadoresQuery.data ?? 0,
     centrosCostoActivos: centrosQuery.data ?? 0,
     planillasPendientes: pendientesQuery.data ?? 0,
-    isLoading: trabajadoresQuery.isLoading || centrosQuery.isLoading || pendientesQuery.isLoading,
+    planillasEnProgreso: enProgresoQuery.data ?? 0,
+    isLoading:
+      trabajadoresQuery.isLoading ||
+      centrosQuery.isLoading ||
+      pendientesQuery.isLoading ||
+      enProgresoQuery.isLoading,
   };
 }
