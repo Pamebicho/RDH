@@ -28,6 +28,8 @@ export interface CentroCostoHoras {
 }
 
 export interface ParetoPunto extends ClienteAreaHoras {
+  /** % del total de horas que representa esta categoría (no acumulado). */
+  porcentaje: number;
   porcentajeAcumulado: number;
 }
 
@@ -89,7 +91,11 @@ export function useResumenPeriodo(periodoId: string | undefined) {
   let acumulado = 0;
   const paretoData: ParetoPunto[] = clienteAreaDetalle.map((item) => {
     acumulado += item.horas;
-    return { ...item, porcentajeAcumulado: totalHoras > 0 ? (acumulado / totalHoras) * 100 : 0 };
+    return {
+      ...item,
+      porcentaje: totalHoras > 0 ? (item.horas / totalHoras) * 100 : 0,
+      porcentajeAcumulado: totalHoras > 0 ? (acumulado / totalHoras) * 100 : 0,
+    };
   });
 
   return {

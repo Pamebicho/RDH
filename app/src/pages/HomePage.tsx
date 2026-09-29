@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   CalendarDays,
@@ -10,7 +9,6 @@ import {
   Download,
   Grid3x3,
   Layers,
-  Settings,
   UserCheck,
   Users,
 } from "lucide-react";
@@ -110,7 +108,13 @@ function GraficoBarrasHorizontales({
   );
 }
 
-/** Gráfico de Pareto: barras de horas por Cliente/Área + línea de % acumulado, con referencia en 80%. */
+/**
+ * Gráfico de Pareto: barras de % del total por Cliente/Área + línea de % acumulado, con
+ * referencia en 80%. Ambas series comparten un solo eje (0-100%) en vez de dos ejes con
+ * escalas distintas: mostrar "horas" y "% acumulado" en ejes separados podía sugerir una
+ * relación visual entre la barra y la línea que no existe (cada eje se autoescala aparte).
+ * Al indexar ambas al mismo 0-100% se conserva el análisis de Pareto sin ese doble eje.
+ */
 function GraficoPareto({ datos, isLoading }: { datos: ParetoPunto[]; isLoading: boolean }) {
   if (isLoading || !datos.length) {
     return <EstadoGrafico isLoading={isLoading} vacio={!datos.length} />;
@@ -130,10 +134,7 @@ function GraficoPareto({ datos, isLoading }: { datos: ParetoPunto[]; isLoading: 
           interval={0}
           height={70}
         />
-        <YAxis yAxisId="horas" tick={{ fontSize: 11, fill: "#51617a" }} axisLine={false} tickLine={false} width={44} />
         <YAxis
-          yAxisId="porcentaje"
-          orientation="right"
           domain={[0, 100]}
           tickFormatter={(v: number) => `${v}%`}
           tick={{ fontSize: 11, fill: "#51617a" }}
@@ -142,24 +143,16 @@ function GraficoPareto({ datos, isLoading }: { datos: ParetoPunto[]; isLoading: 
           width={44}
         />
         <Tooltip
-          formatter={(value, name) =>
-            name === "porcentajeAcumulado"
-              ? [`${Number(value).toFixed(1)}%`, "Acumulado"]
-              : [`${formatHours(Number(value))} h`, "Horas"]
-          }
+          formatter={(value, name, item) => {
+            if (name === "porcentajeAcumulado") return [`${Number(value).toFixed(1)}%`, "Acumulado"];
+            const horas = (item?.payload as ParetoPunto | undefined)?.horas ?? 0;
+            return [`${Number(value).toFixed(1)}% (${formatHours(horas)} h)`, "% del total"];
+          }}
           contentStyle={{ borderRadius: 8, borderColor: "#dfe5ee", fontSize: 12 }}
         />
-        <Bar yAxisId="horas" dataKey="horas" fill="#0868ee" radius={[4, 4, 0, 0]} />
-        <Line
-          yAxisId="porcentaje"
-          type="monotone"
-          dataKey="porcentajeAcumulado"
-          stroke="#e05555"
-          strokeWidth={2}
-          dot={{ r: 3 }}
-        />
+        <Bar dataKey="porcentaje" fill="#0868ee" radius={[4, 4, 0, 0]} />
+        <Line type="monotone" dataKey="porcentajeAcumulado" stroke="#e05555" strokeWidth={2} dot={{ r: 3 }} />
         <ReferenceLine
-          yAxisId="porcentaje"
           y={80}
           stroke="#94a3b8"
           strokeDasharray="4 4"
@@ -247,7 +240,6 @@ function TablaCentrosCosto({ datos, isLoading }: { datos: CentroCostoHoras[]; is
 }
 
 function SuperAdminDashboard() {
-  const navigate = useNavigate();
   const resumen = useResumenSuperAdmin();
   const periodosQuery = usePeriodos();
   const exportarPeriodo = useExportarResumenPeriodo();
@@ -433,20 +425,6 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => navigate("/aprobaciones")} className="btn-outline min-h-[42px] px-3 text-sm">
-          <CheckCircle2 className="h-4 w-4" aria-hidden />
-          Ver aprobaciones
-        </button>
-        <button type="button" onClick={() => navigate("/administracion")} className="btn-outline min-h-[42px] px-3 text-sm">
-          <Users className="h-4 w-4" aria-hidden />
-          Personas y roles
-        </button>
-        <button type="button" onClick={() => navigate("/administracion")} className="btn-outline min-h-[42px] px-3 text-sm">
-          <Settings className="h-4 w-4" aria-hidden />
-          Configuración
-        </button>
-      </div>
     </div>
   );
 }
