@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "@/components/layout/AppShell";
 import { useWorkforce } from "@/features/workforce/useWorkforce";
@@ -14,7 +14,7 @@ import {
 import { PeriodSelector } from "@/features/hours/components/PeriodSelector";
 import { PeriodoSection } from "@/features/hours/components/PeriodoSection";
 import { ProjectsModal } from "@/features/hours/components/ProjectsModal";
-import { encontrarPeriodoActual } from "@/utils/date";
+import { encontrarPeriodoActual, periodoYaComenzo } from "@/utils/date";
 
 export function HoursRegisterPage() {
   const navigate = useNavigate();
@@ -25,12 +25,20 @@ export function HoursRegisterPage() {
   const [projectsModalOpen, setProjectsModalOpen] = useState(false);
 
   const periodosQuery = usePeriodos();
+  // Un trabajador no puede seleccionar ni cargar horas en un período que todavía no comienza
+  // (nace el día 25): evita confundir el mes en curso al enviar la información. Los períodos ya
+  // iniciados (aunque hayan terminado) siempre se mantienen disponibles, para corregir meses
+  // anteriores.
+  const periodosDisponibles = useMemo(
+    () => (periodosQuery.data ?? []).filter(periodoYaComenzo),
+    [periodosQuery.data],
+  );
   const semanasQuery = useSemanas(periodoId || undefined);
   const proyectosSeleccionadosQuery = useProyectosSeleccionados(trabajador?.id, periodoId || undefined);
   const columnasInfo = useColumnas(proyectosSeleccionadosQuery.data);
   const updateProyectosSeleccionados = useUpdateProyectosSeleccionados(trabajador?.id, periodoId || undefined);
 
-  const periodoActual = periodosQuery.data?.find((periodo) => periodo.id === periodoId);
+  const periodoActual = periodosDisponibles.find((periodo) => periodo.id === periodoId);
   const exportarPeriodo = useExportarPeriodo(
     trabajador?.id,
     periodoActual,
@@ -40,15 +48,15 @@ export function HoursRegisterPage() {
   const periodoPlanilla = usePeriodoPlanilla(trabajador?.id, periodoActual, semanasQuery.data ?? [], columnasInfo.columnas);
 
   useEffect(() => {
-    if (!periodosQuery.data?.length) return;
-    const stillExists = periodosQuery.data.some((periodo) => periodo.id === periodoId);
+    if (!periodosDisponibles.length) return;
+    const stillExists = periodosDisponibles.some((periodo) => periodo.id === periodoId);
     if (!stillExists) {
-      const actual = encontrarPeriodoActual(periodosQuery.data);
+      const actual = encontrarPeriodoActual(periodosDisponibles);
       if (actual) setPeriodoId(actual.id);
     }
-    // Solo debe reaccionar cuando cambia el catálogo de períodos disponible.
+    // Solo debe reaccionar cuando cambia el catálogo de períodos disponibles.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [periodosQuery.data]);
+  }, [periodosDisponibles]);
 
   return (
     <AppShell>
@@ -78,7 +86,7 @@ export function HoursRegisterPage() {
       <PeriodSelector
         periodoId={periodoId}
         onPeriodoChange={setPeriodoId}
-        periodos={periodosQuery.data ?? []}
+        periodos={periodosDisponibles}
         onManageProjects={() => {
           void columnasInfo.refetchProyectos();
           setProjectsModalOpen(true);

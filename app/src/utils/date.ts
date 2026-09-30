@@ -51,3 +51,8 @@ export function encontrarPeriodoActual(periodos: Periodo[]): Periodo | undefined
     periodo.fecha_inicio < masProximo.fecha_inicio ? periodo : masProximo,
   );
 }
+
+/** true si el período ya comenzó (su fecha de inicio ya llegó o pasó). */
+export function periodoYaComenzo(periodo: Periodo): boolean {
+  return periodo.fecha_inicio <= hoyIso();
+}
