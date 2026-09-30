@@ -8,6 +8,7 @@ import {
   getColumnTotal,
   getDayTotal,
   getWeekTotal,
+  resolverEtiquetaCentroCosto,
   type ColumnaRegistro,
   type HoursByDateAndColumn,
 } from "@/features/hours/domain";
@@ -253,7 +254,7 @@ function buildColumnasDesdeRegistros(
       tipoRegistroId: tipo.id,
       proyectoId: registro.proyecto_id,
       codigo: proyecto?.codigo ?? tipo.codigo,
-      etiqueta: proyecto?.nombre ?? tipo.nombre,
+      etiqueta: proyecto ? resolverEtiquetaCentroCosto(proyecto.codigo, proyecto.nombre) : tipo.nombre,
       categoria: tipo.categoria,
       esHoraExtra: tipo.es_hora_extra,
     });

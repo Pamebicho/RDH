@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminProyectos } from "@/features/admin/hooks";
 import { fetchAreas, fetchCargos, fetchProyectos, fetchTrabajadores } from "@/features/admin/api";
-import { descargarCsv, rowsToCsv } from "@/features/hours/domain";
+import { descargarCsv, resolverEtiquetaCentroCosto, rowsToCsv } from "@/features/hours/domain";
 import type { Periodo } from "@/types/database.types";
 import {
   fetchCentrosCostoActivosCount,
@@ -59,7 +59,11 @@ export function useResumenPeriodo(periodoId: string | undefined) {
   const proyectosActivos = (proyectosQuery.data ?? []).filter((p) => p.activo);
 
   const centrosCostoDetalle: CentroCostoHoras[] = proyectosActivos
-    .map((p) => ({ codigo: p.codigo, nombre: p.nombre, horas: horasPorProyectoId.get(p.id) ?? 0 }))
+    .map((p) => ({
+      codigo: p.codigo,
+      nombre: resolverEtiquetaCentroCosto(p.codigo, p.nombre),
+      horas: horasPorProyectoId.get(p.id) ?? 0,
+    }))
     .sort((a, b) => b.horas - a.horas);
 
   const ccUtilizados = centrosCostoDetalle.filter((c) => c.horas > 0).length;
@@ -139,7 +143,7 @@ export function useExportarResumenPeriodo() {
             cargo: t?.cargo_id ? cargoPorId.get(t.cargo_id) ?? "" : "",
             fecha: r.fecha,
             codigo: p?.codigo ?? "",
-            nombreProyecto: p?.nombre ?? "",
+            nombreProyecto: p ? resolverEtiquetaCentroCosto(p.codigo, p.nombre) : "",
             clienteArea: p?.cliente_area ?? "",
             horas: Number(r.horas),
           };

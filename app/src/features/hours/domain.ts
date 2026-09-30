@@ -9,6 +9,24 @@ export const MAX_DAILY_HOURS = 24;
  */
 export const FIXED_COST_CENTER_CODES = ["20-004", "20-009", "20-013", "20-015", "20-020"] as const;
 
+/**
+ * Nombres a mostrar para los centros de costo fijos, distintos del "nombre" real guardado en
+ * Supabase (tabla proyectos) — es solo un cambio visual del frontend, sin tocar la base de datos.
+ * Se aplica con `resolverEtiquetaCentroCosto` en cada lugar donde se arma la etiqueta de columna.
+ */
+export const FIXED_COST_CENTER_LABELS: Record<string, string> = {
+  "20-004": "Reunión de Operaciones",
+  "20-009": "Capacitaciones Técnicas",
+  "20-013": "Gestión de Operaciones",
+  "20-015": "Capacitaciones Seguridad",
+  "20-020": "Gestión Oferta Técnica",
+};
+
+/** Nombre a mostrar para un centro de costo: el override fijo si existe, si no el real de la BD. */
+export function resolverEtiquetaCentroCosto(codigo: string, nombreReal: string): string {
+  return FIXED_COST_CENTER_LABELS[codigo] ?? nombreReal;
+}
+
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] as const;
 
 export interface DayInfo {

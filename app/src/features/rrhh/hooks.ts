@@ -1,7 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAdminProyectos } from "@/features/admin/hooks";
-import { descargarCsv, rowsToCsv } from "@/features/hours/domain";
+import { descargarCsv, resolverEtiquetaCentroCosto, rowsToCsv } from "@/features/hours/domain";
 import type { Periodo, RegistroHoras } from "@/types/database.types";
 import { fetchPlanillasDelPeriodo, fetchRegistrosPorPlanillas, fetchTrabajadores } from "./api";
 
@@ -79,7 +79,7 @@ export function useDistribucionCC(periodoId: string | undefined) {
           const proyecto = proyectoPorId.get(proyectoId);
           return {
             codigo: proyecto?.codigo ?? "",
-            nombre: proyecto?.nombre ?? "",
+            nombre: proyecto ? resolverEtiquetaCentroCosto(proyecto.codigo, proyecto.nombre) : "",
             horas,
             porcentaje: totalHoras > 0 ? (horas / totalHoras) * 100 : 0,
           };

@@ -11,6 +11,7 @@ import {
   getTotalesPorCategoria,
   getWeekExpectedHours,
   getWeekTotal,
+  resolverEtiquetaCentroCosto,
   rowsToCsv,
   roundHours,
   type ColumnaRegistro,
@@ -157,5 +158,15 @@ describe("buildCsvRows / rowsToCsv", () => {
 
     const csv = rowsToCsv([["Día", 'Centro "A"']]);
     expect(csv).toBe('"Día";"Centro ""A"""');
+  });
+});
+
+describe("resolverEtiquetaCentroCosto", () => {
+  it("devuelve el nombre override para un centro de costo fijo", () => {
+    expect(resolverEtiquetaCentroCosto("20-004", "Reunión Operaciones")).toBe("Reunión de Operaciones");
+  });
+
+  it("devuelve el nombre real (de la base de datos) para códigos sin override", () => {
+    expect(resolverEtiquetaCentroCosto("41-341", "Mig. PLC CCCH")).toBe("Mig. PLC CCCH");
   });
 });

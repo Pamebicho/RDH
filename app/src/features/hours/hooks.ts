@@ -30,6 +30,7 @@ import {
   getWeekExpectedHours,
   getWeekTotal,
   MAX_DAILY_HOURS,
+  resolverEtiquetaCentroCosto,
   rowsToCsv,
   type ColumnaRegistro,
   type HoursByDateAndColumn,
@@ -106,7 +107,7 @@ export function useColumnas(proyectosSeleccionadosIds?: string[]) {
       tipoRegistroId: tipoOrd.id,
       proyectoId: proyecto.id,
       codigo: proyecto.codigo,
-      etiqueta: proyecto.nombre,
+      etiqueta: resolverEtiquetaCentroCosto(proyecto.codigo, proyecto.nombre),
       categoria: tipoOrd.categoria,
       esHoraExtra: tipoOrd.es_hora_extra,
     }));
