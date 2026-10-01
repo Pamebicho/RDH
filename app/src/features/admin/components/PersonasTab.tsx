@@ -10,8 +10,8 @@ type Columna = "nombres" | "apellidos" | "rut" | "cargo" | "jefatura";
 type Direccion = "asc" | "desc";
 
 const COLUMNAS: { key: Columna; label: string }[] = [
-  { key: "nombres", label: "Nombre" },
   { key: "apellidos", label: "Apellido" },
+  { key: "nombres", label: "Nombre" },
   { key: "rut", label: "RUT" },
   { key: "cargo", label: "Cargo" },
   { key: "jefatura", label: "Jefatura" },
@@ -131,7 +131,7 @@ export function PersonasTab() {
               id="trabajador-busqueda"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por nombre, apellido, RUT, cargo…"
+              placeholder="Buscar por apellido, nombre, RUT, cargo…"
               className="form-input pl-9"
             />
           </div>
@@ -173,8 +173,8 @@ export function PersonasTab() {
                 {trabajadoresFiltrados.map((trabajador, index) => (
                   <tr key={trabajador.id}>
                     <td className="px-4 py-3 text-ink-muted">{index + 1}</td>
-                    <td className="px-4 py-3 font-medium text-ink">{trabajador.nombres || "—"}</td>
-                    <td className="px-4 py-3 text-ink">{trabajador.apellidos || "—"}</td>
+                    <td className="px-4 py-3 font-medium text-ink">{trabajador.apellidos || "—"}</td>
+                    <td className="px-4 py-3 text-ink">{trabajador.nombres || "—"}</td>
                     <td className="px-4 py-3 text-ink">{trabajador.rut || "—"}</td>
                     <td className="px-4 py-3 text-ink">
                       {trabajador.cargo_id ? cargoPorId.get(trabajador.cargo_id) ?? "—" : "—"}
