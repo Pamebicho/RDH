@@ -26,7 +26,10 @@ export function PersonasTab() {
   const [trabajadorAEditar, setTrabajadorAEditar] = useState<Trabajador | null>(null);
   const [trabajadorAEliminar, setTrabajadorAEliminar] = useState<Trabajador | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [orden, setOrden] = useState<{ columna: Columna; direccion: Direccion } | null>(null);
+  const [orden, setOrden] = useState<{ columna: Columna; direccion: Direccion } | null>({
+    columna: "apellidos",
+    direccion: "asc",
+  });
   const setActivo = useSetTrabajadorActivo();
 
   const cargoPorId = new Map((cargosQuery.data ?? []).map((cargo) => [cargo.id, cargo.nombre]));
