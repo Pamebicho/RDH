@@ -1,8 +1,9 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { fetchRegistrosPorPlanillas } from "@/features/home/api";
-import { fetchProyectosActivos, fetchTiposRegistroActivos } from "@/features/hours/api";
+import { fetchTrabajadores } from "@/features/admin/api";
+import { fetchPlanillasDelPeriodo, fetchRegistrosPorPlanillas } from "@/features/home/api";
+import { fetchProyectosActivos, fetchSemanas, fetchTiposRegistroActivos } from "@/features/hours/api";
 import {
   createWeekDays,
   getColumnTotal,
@@ -12,7 +13,8 @@ import {
   type ColumnaRegistro,
   type HoursByDateAndColumn,
 } from "@/features/hours/domain";
-import type { PlanillaEstado, PlanillaSemanal, RegistroHoras, Periodo, Trabajador } from "@/types/database.types";
+import { hoyIso } from "@/utils/date";
+import type { PlanillaEstado, PlanillaSemanal, RegistroHoras, Periodo, Semana, Trabajador } from "@/types/database.types";
 import {
   aprobarPlanilla,
   devolverPlanilla,
@@ -349,4 +351,113 @@ export function useDevolverPeriodo(administradorId: string | undefined) {
     },
     onError: () => toast.error("No fue posible devolver el período."),
   });
+}
+
+export interface SemanaEstadoCumplimiento {
+  semanaId: string;
+  numeroSemana: number;
+  fechaInicio: string;
+  fechaFin: string;
+  /** true si guardó al menos una hora (ordinaria, extra o ausencia) esa semana. */
+  registro: boolean;
+}
+
+export interface TrabajadorCumplimiento {
+  trabajadorId: string;
+  nombre: string;
+  semanas: SemanaEstadoCumplimiento[];
+  semanasSinRegistrar: number;
+}
+
+function tieneHorasGuardadas(planilla: PlanillaSemanal | undefined): boolean {
+  if (!planilla) return false;
+  return (
+    Number(planilla.total_ordinarias) + Number(planilla.total_extraordinarias) + Number(planilla.total_ausencias) > 0
+  );
+}
+
+/**
+ * Cruza trabajadores activos × semanas ya iniciadas contra las planillas del período, y arma la
+ * matriz de cumplimiento. Excluye a quienes no tienen ninguna semana pendiente (ya están al día).
+ * Lógica pura, separada del hook para poder testearla sin mockear React Query.
+ */
+export function calcularCumplimientoSemanal(
+  trabajadoresActivos: Trabajador[],
+  semanasIniciadas: Semana[],
+  planillas: PlanillaSemanal[],
+): TrabajadorCumplimiento[] {
+  if (!semanasIniciadas.length) return [];
+
+  const filas: (TrabajadorCumplimiento & { apellidoOrden: string })[] = [];
+
+  for (const trabajador of trabajadoresActivos) {
+    const semanasEstado: SemanaEstadoCumplimiento[] = semanasIniciadas.map((semana) => ({
+      semanaId: semana.id,
+      numeroSemana: semana.numero_semana,
+      fechaInicio: semana.fecha_inicio,
+      fechaFin: semana.fecha_fin,
+      registro: tieneHorasGuardadas(
+        planillas.find((p) => p.trabajador_id === trabajador.id && p.semana_id === semana.id),
+      ),
+    }));
+
+    const semanasSinRegistrar = semanasEstado.filter((s) => !s.registro).length;
+    if (semanasSinRegistrar === 0) continue;
+
+    const nombre = [trabajador.nombres, trabajador.apellidos].filter(Boolean).join(" ");
+    filas.push({
+      trabajadorId: trabajador.id,
+      nombre: nombre || trabajador.correo_corporativo,
+      apellidoOrden: trabajador.apellidos || nombre || trabajador.correo_corporativo,
+      semanas: semanasEstado,
+      semanasSinRegistrar,
+    });
+  }
+
+  return filas
+    .sort(
+      (a, b) =>
+        b.semanasSinRegistrar - a.semanasSinRegistrar || a.apellidoOrden.localeCompare(b.apellidoOrden, "es"),
+    )
+    .map(({ apellidoOrden: _apellidoOrden, ...fila }) => fila);
+}
+
+/**
+ * Para cada trabajador activo, marca semana por semana (solo las ya iniciadas del período) si
+ * guardó algo o no. Solo SUPER_ADMIN ve el panorama completo: un Administrador normal no puede
+ * ver, vía RLS, a un trabajador que no registró absolutamente nada en ninguno de sus proyectos.
+ */
+export function useCumplimientoSemanal(periodoId: string | undefined) {
+  const trabajadoresQuery = useQuery({ queryKey: ["trabajadores-admin-todos"], queryFn: fetchTrabajadores });
+  const semanasQuery = useQuery({
+    queryKey: ["semanas", periodoId],
+    queryFn: () => fetchSemanas(periodoId as string),
+    enabled: Boolean(periodoId),
+  });
+  const planillasQuery = useQuery({
+    queryKey: ["resumen-periodo-planillas", periodoId],
+    queryFn: () => fetchPlanillasDelPeriodo(periodoId as string),
+    enabled: Boolean(periodoId),
+  });
+
+  const semanas: Semana[] = useMemo(
+    () => (semanasQuery.data ?? []).filter((semana) => semana.fecha_inicio <= hoyIso()),
+    [semanasQuery.data],
+  );
+
+  const trabajadores: TrabajadorCumplimiento[] = useMemo(
+    () =>
+      calcularCumplimientoSemanal(
+        (trabajadoresQuery.data ?? []).filter((t) => t.activo),
+        semanas,
+        planillasQuery.data ?? [],
+      ),
+    [trabajadoresQuery.data, planillasQuery.data, semanas],
+  );
+
+  return {
+    semanas,
+    trabajadores,
+    isLoading: trabajadoresQuery.isLoading || semanasQuery.isLoading || planillasQuery.isLoading,
+  };
 }
